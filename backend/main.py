@@ -196,6 +196,9 @@ async def _spotify_track_search(
         ]
         offsets = (0,)
 
+    all_items: list[dict[str, Any]] = []
+    first_response_body: dict[str, Any] | None = None
+
     async with httpx.AsyncClient(timeout=15) as client:
         for search_query in dict.fromkeys(search_queries):
             if not search_query.strip():
@@ -242,6 +245,7 @@ async def _spotify_track_search(
                             )
                             if response.status_code < 400:
                                 response_body = response.json()
+                                first_response_body ??= response_body
                                 items = response_body.get("tracks", {}).get(
                                     "items",
                                     [],
@@ -276,6 +280,7 @@ async def _spotify_track_search(
                         break
 
                     response_body = response.json()
+                    first_response_body ??= response_body
                     items = response_body.get("tracks", {}).get("items", [])
                     print(
                         "AURALIA Spotify search ok "
@@ -289,10 +294,13 @@ async def _spotify_track_search(
                         break
 
                 if response_body is not None and combined_items:
-                    response_body.setdefault("tracks", {})["items"] = combined_items
-                    response_body["tracks"]["limit"] = len(combined_items)
-                    response_body["tracks"]["total"] = len(combined_items)
-                    return response_body
+                    all_items.extend(combined_items)
+
+    if first_response_body is not None and all_items:
+        first_response_body.setdefault("tracks", {})["items"] = all_items
+        first_response_body["tracks"]["limit"] = len(all_items)
+        first_response_body["tracks"]["total"] = len(all_items)
+        return first_response_body
 
     if not allow_fallback:
         return await _spotify_empty_search(query, "no_usable_spotify_tracks")
@@ -671,6 +679,7 @@ def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]
         if item.get("is_playable", True)
         and not item.get("is_local", False)
         and _release_year_is_allowed(item)
+        and _looks_like_real_song(item)
     ]
 
     ranked = sorted(
@@ -692,6 +701,60 @@ def _release_year_is_allowed(item: dict[str, Any]) -> bool:
     except ValueError:
         return False
     return _min_release_year <= year <= _max_release_year
+
+
+def _looks_like_real_song(item: dict[str, Any]) -> bool:
+    duration_ms = item.get("duration_ms")
+    if isinstance(duration_ms, (int, float)):
+        if duration_ms < 90_000 or duration_ms > 8 * 60_000:
+            return False
+
+    artists = item.get("artists")
+    if not isinstance(artists, list) or not artists:
+        return False
+
+    album = item.get("album", {})
+    images = album.get("images", []) if isinstance(album, dict) else []
+    if not images:
+        return False
+
+    popularity = item.get("popularity")
+    if isinstance(popularity, int) and popularity < 35:
+        return False
+
+    text_parts = [
+        str(item.get("name", "")),
+        str(album.get("name", "")) if isinstance(album, dict) else "",
+        " ".join(
+            str(artist.get("name", ""))
+            for artist in artists
+            if isinstance(artist, dict)
+        ),
+    ]
+    searchable = " ".join(text_parts).lower()
+    blocked_terms = {
+        "karaoke",
+        "tribute",
+        "cover version",
+        "instrumental",
+        "piano version",
+        "lofi",
+        "lo-fi",
+        "sped up",
+        "slowed",
+        "nightcore",
+        "8d audio",
+        "podcast",
+        "episode",
+        "meditation",
+        "frequency",
+        "white noise",
+        "rain sounds",
+        "sleep sounds",
+        "tabata",
+        "workout timer",
+    }
+    return not any(term in searchable for term in blocked_terms)
 
 
 def _constrain_spotify_query(query: str) -> str:

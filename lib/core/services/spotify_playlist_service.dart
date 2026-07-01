@@ -671,6 +671,7 @@ class SpotifyPlaylistService implements PlaylistService {
       mood,
       fallbackOptions,
     );
+    final sessionSeen = <String>{};
     for (var optionIndex = 0; optionIndex < playlistTemplates.length; optionIndex++) {
       final fallback = playlistTemplates[optionIndex];
       final tracks = <AuraliaTrack>[];
@@ -691,6 +692,7 @@ class SpotifyPlaylistService implements PlaylistService {
           final selected = _pickSpotifyTrack(
             group: group,
             playlistSeen: playlistSeen,
+            sessionSeen: sessionSeen,
             startIndex:
                 sessionOffset +
                 contextOffset +
@@ -700,6 +702,7 @@ class SpotifyPlaylistService implements PlaylistService {
                 offsets[trackIndex % offsets.length],
           );
           tracks.add(selected);
+          sessionSeen.add(_trackKey(selected));
         }
       }
 
@@ -725,8 +728,18 @@ class SpotifyPlaylistService implements PlaylistService {
   AuraliaTrack _pickSpotifyTrack({
     required List<AuraliaTrack> group,
     required Set<String> playlistSeen,
+    required Set<String> sessionSeen,
     required int startIndex,
   }) {
+    for (var offset = 0; offset < group.length; offset++) {
+      final track = group[(startIndex + offset) % group.length];
+      final key = _trackKey(track);
+      if (!playlistSeen.contains(key) && !sessionSeen.contains(key)) {
+        playlistSeen.add(key);
+        return track;
+      }
+    }
+
     for (var offset = 0; offset < group.length; offset++) {
       final track = group[(startIndex + offset) % group.length];
       final key = _trackKey(track);
