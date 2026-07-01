@@ -27,7 +27,7 @@ _spotify_search_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 _spotify_search_cache_ttl = 60 * 60 * 6
 _spotify_image_cache: dict[str, str] = {}
 _spotify_search_limit = 50
-_min_release_year = 2015
+_min_release_year = 2021
 _max_release_year = 2026
 
 

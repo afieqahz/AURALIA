@@ -987,7 +987,7 @@ class SpotifyPlaylistService implements PlaylistService {
     required double energy,
     required String accessToken,
   }) async {
-    final constrainedQuery = 'english $query year:2015-2026';
+    final constrainedQuery = 'english $query year:2021-2026';
     final http.Response response;
     try {
       response = AppConfig.spotifyBackendUrl.isNotEmpty
@@ -1047,7 +1047,7 @@ class SpotifyPlaylistService implements PlaylistService {
     final year = int.tryParse(
       releaseDate.length >= 4 ? releaseDate.substring(0, 4) : '',
     );
-    return year != null && year >= 2015 && year <= 2026;
+    return year != null && year >= 2021 && year <= 2026;
   }
 
   Uri _backendSearchUri(String query) {
