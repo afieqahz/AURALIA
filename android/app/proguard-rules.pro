@@ -1,0 +1,11 @@
+-keep class com.spotify.** { *; }
+-keep interface com.spotify.** { *; }
+-keep class com.fasterxml.jackson.** { *; }
+-keep class org.codehaus.jackson.** { *; }
+-keep @com.fasterxml.jackson.annotation.JsonIgnoreProperties class * { *; }
+-keep @com.fasterxml.jackson.annotation.JsonProperty class * { *; }
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
+
+-dontwarn com.spotify.**
+-dontwarn com.fasterxml.jackson.**
+-dontwarn org.codehaus.jackson.**
