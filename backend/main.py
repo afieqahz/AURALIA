@@ -245,7 +245,8 @@ async def _spotify_track_search(
                             )
                             if response.status_code < 400:
                                 response_body = response.json()
-                                first_response_body ??= response_body
+                                if first_response_body is None:
+                                    first_response_body = response_body
                                 items = response_body.get("tracks", {}).get(
                                     "items",
                                     [],
@@ -280,7 +281,8 @@ async def _spotify_track_search(
                         break
 
                     response_body = response.json()
-                    first_response_body ??= response_body
+                    if first_response_body is None:
+                        first_response_body = response_body
                     items = response_body.get("tracks", {}).get("items", [])
                     print(
                         "AURALIA Spotify search ok "
