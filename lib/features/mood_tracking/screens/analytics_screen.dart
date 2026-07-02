@@ -44,38 +44,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Mood Analytics',
-                  style: GoogleFonts.poppins(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF38143E),
-                  ),
-                ),
-              ),
-              _RangeSelector(
-                value: _range,
-                onChanged: (range) => setState(() {
+              _AnalyticsHeader(
+                analytics: analytics,
+                range: _range,
+                onRangeChanged: (range) => setState(() {
                   _range = range;
                   _periodOffset = 0;
                 }),
               ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Text(
-            _range == _AnalyticsRange.weekly
-                ? 'Your emotional pattern for the selected week'
-                : 'Your emotional pattern for the selected month',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: Colors.black45,
-            ),
-          ),
-          const SizedBox(height: 22),
+              const SizedBox(height: 18),
           Row(
             children: [
               Expanded(
@@ -170,6 +147,201 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _AnalyticsHeader extends StatelessWidget {
+  const _AnalyticsHeader({
+    required this.analytics,
+    required this.range,
+    required this.onRangeChanged,
+  });
+
+  final _MoodAnalytics analytics;
+  final _AnalyticsRange range;
+  final ValueChanged<_AnalyticsRange> onRangeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final mood = analytics.dominantMood;
+    final hasEntries = analytics.entries.isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A0736), Color(0xFF64226D), Color(0xFF9B5A91)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4A154B).withValues(alpha: 0.24),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -34,
+            top: -38,
+            child: Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -48,
+            bottom: -62,
+            child: Container(
+              width: 155,
+              height: 155,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFF09EE6).withValues(alpha: 0.11),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.16),
+                      ),
+                    ),
+                    child: Icon(
+                      hasEntries ? _moodIcon(mood) : Icons.auto_graph_rounded,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Mood Analytics',
+                          style: GoogleFonts.poppins(
+                            fontSize: 23,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          range == _AnalyticsRange.weekly
+                              ? 'Your emotional pattern this week'
+                              : 'Your emotional pattern this month',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.74),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _RangeSelector(value: range, onChanged: onRangeChanged),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          hasEntries ? analytics.baselineLabel : 'No data yet',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          hasEntries
+                              ? '${analytics.totalMoodEntries} mood entries recorded'
+                              : 'Record a mood to unlock your report',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.72),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _HeaderSparkline(buckets: analytics.buckets),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderSparkline extends StatelessWidget {
+  const _HeaderSparkline({required this.buckets});
+
+  final List<_MoodBucket> buckets;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxCount = buckets.fold<int>(
+      1,
+      (max, bucket) => bucket.total > max ? bucket.total : max,
+    );
+
+    return SizedBox(
+      width: 74,
+      height: 42,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: List.generate(buckets.length > 7 ? 7 : buckets.length, (index) {
+          final bucket = buckets[index];
+          final height = bucket.total == 0
+              ? 8.0
+              : 10 + (30 * bucket.total / maxCount);
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: 8, end: height),
+            duration: Duration(milliseconds: 420 + index * 55),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) => Container(
+              width: 6,
+              height: value,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(
+                  alpha: bucket.total == 0 ? 0.24 : 0.76,
+                ),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          );
+        }),
+      ),
     );
   }
 }
@@ -404,29 +576,48 @@ class _TrendCardState extends State<_TrendCard> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [Colors.white, Color(0xFFFFFBFF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4A154B).withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF4A154B).withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
+        border: Border.all(color: const Color(0xFFF4EAF5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEADFFF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.stacked_bar_chart_rounded,
+                  color: Color(0xFF5A2C62),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 11),
               Expanded(
                 child: Text(
                   'Mood Trends',
                   style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                     color: const Color(0xFF38143E),
                   ),
                 ),
@@ -463,7 +654,7 @@ class _TrendCardState extends State<_TrendCard> {
                 )
                 .toList(),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           SizedBox(
             height: 220,
             child: LayoutBuilder(
@@ -566,37 +757,52 @@ class _MoodBar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 5),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: selected ? 26 : 24,
-            height: height.clamp(8.0, 140.0).toDouble(),
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEDE4EE),
-              borderRadius: BorderRadius.circular(7),
-              boxShadow: selected
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF5A2C62).withValues(alpha: 0.24),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
-            ),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 8, end: height.clamp(8.0, 140.0).toDouble()),
+            duration: const Duration(milliseconds: 520),
+            curve: Curves.easeOutCubic,
+            builder: (context, animatedHeight, child) {
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: selected ? 28 : 24,
+                height: animatedHeight,
+                padding: selected ? const EdgeInsets.all(2) : EdgeInsets.zero,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEDE4EE),
+                  borderRadius: BorderRadius.circular(99),
+                  border: selected
+                      ? Border.all(color: const Color(0xFF5A2C62), width: 1.2)
+                      : null,
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF5A2C62).withValues(alpha: 0.22),
+                            blurRadius: 14,
+                            offset: const Offset(0, 7),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: child,
+              );
+            },
             child: total == 0
                 ? null
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: AuraliaMood.values
-                        .where((mood) => bucket.counts[mood]! > 0)
-                        .map(
-                          (mood) => Expanded(
-                            flex: bucket.counts[mood]!,
-                            child: Container(color: _moodColor(mood)),
-                          ),
-                        )
-                        .toList(),
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: AuraliaMood.values
+                          .where((mood) => bucket.counts[mood]! > 0)
+                          .map(
+                            (mood) => Expanded(
+                              flex: bucket.counts[mood]!,
+                              child: Container(color: _moodColor(mood)),
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
           ),
           const SizedBox(height: 8),
@@ -814,17 +1020,39 @@ class _InsightTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: insight.color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
+        gradient: LinearGradient(
+          colors: [
+            insight.color.withValues(alpha: 0.16),
+            Colors.white,
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: insight.color.withValues(alpha: 0.18)),
+        boxShadow: [
+          BoxShadow(
+            color: insight.color.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(insight.icon, size: 20, color: insight.color),
-          const SizedBox(width: 11),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.74),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(insight.icon, size: 20, color: insight.color),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               insight.text,
@@ -926,13 +1154,18 @@ class _MoodDistributionCard extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(5),
-                  child: LinearProgressIndicator(
-                    value: percentage,
-                    minHeight: 8,
-                    backgroundColor: const Color(0xFFEDE7EE),
-                    valueColor: AlwaysStoppedAnimation(_moodColor(mood)),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: percentage),
+                  duration: const Duration(milliseconds: 620),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, _) => ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: value,
+                      minHeight: 10,
+                      backgroundColor: const Color(0xFFF0E8F1),
+                      valueColor: AlwaysStoppedAnimation(_moodColor(mood)),
+                    ),
                   ),
                 ),
               ),
@@ -959,8 +1192,20 @@ class _MoodDistributionCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [Colors.white, Color(0xFFFFFBFF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF4EAF5)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4A154B).withValues(alpha: 0.07),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -991,48 +1236,92 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 112),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: iconColor, size: 22),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 520),
+      curve: Curves.easeOutCubic,
+      builder: (context, t, child) {
+        return Transform.translate(
+          offset: Offset(0, 12 * (1 - t)),
+          child: Opacity(opacity: t, child: child),
+        );
+      },
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 126),
+        clipBehavior: Clip.antiAlias,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: iconColor.withValues(alpha: 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -28,
+              top: -32,
+              child: Container(
+                width: 86,
+                height: 86,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.34),
+                ),
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.62),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(icon, color: iconColor, size: 21),
+                    ),
+                    const Spacer(),
+                    if (infoTitle != null && infoText != null)
+                      _InfoButton(
+                        title: infoTitle!,
+                        text: infoText!,
+                        size: 18,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Text(
                   label,
                   style: GoogleFonts.poppins(
                     fontSize: 12,
-                    color: Colors.black54,
+                    color: const Color(0xFF4E3A50).withValues(alpha: 0.68),
                   ),
                 ),
-              ),
-              if (infoTitle != null && infoText != null)
-                _InfoButton(
-                  title: infoTitle!,
-                  text: infoText!,
-                  size: 18,
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF38143E),
+                  ),
                 ),
-            ],
-          ),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.poppins(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF38143E),
+              ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
