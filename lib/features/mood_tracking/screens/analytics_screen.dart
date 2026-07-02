@@ -182,25 +182,25 @@ class _AnalyticsHeader extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Mood Analytics',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
+          Text(
+            'Mood Analytics',
+            maxLines: 1,
+            overflow: TextOverflow.visible,
+            style: GoogleFonts.poppins(
+              fontSize: 23,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
                   range == _AnalyticsRange.weekly
                       ? 'Your emotional pattern this week'
                       : 'Your emotional pattern this month',
@@ -212,11 +212,11 @@ class _AnalyticsHeader extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.78),
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              _RangeSelector(value: range, onChanged: onRangeChanged),
+            ],
           ),
-          const SizedBox(width: 14),
-          _RangeSelector(value: range, onChanged: onRangeChanged),
         ],
       ),
     );
