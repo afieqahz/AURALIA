@@ -291,7 +291,7 @@ class _AuraliaHeroCardState extends State<_AuraliaHeroCard>
       onTap: widget.onTap,
       child: Container(
         width: double.infinity,
-        height: 198,
+        height: 190,
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF230731), Color(0xFF5A1E66), Color(0xFF7B3677)],
@@ -338,7 +338,7 @@ class _AuraliaHeroCardState extends State<_AuraliaHeroCard>
                           color: Colors.white.withValues(alpha: 0.76),
                         ),
                       ),
-                      const SizedBox(height: 22),
+                      const SizedBox(height: 18),
                       _HeroMiniEqualizer(controller: _pulseController),
                     ],
                   ),
@@ -347,7 +347,7 @@ class _AuraliaHeroCardState extends State<_AuraliaHeroCard>
             ),
             Positioned(
               right: 16,
-              top: 22,
+              top: 20,
               child: SizedBox(
                 width: 116,
                 child: Column(
@@ -391,7 +391,7 @@ class _AuraliaHeroCardState extends State<_AuraliaHeroCard>
                         },
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,

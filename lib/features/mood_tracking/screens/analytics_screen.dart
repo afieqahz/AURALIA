@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -133,7 +135,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ...analytics.insights.map(
               (insight) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: _InsightTile(insight: insight),
+                child: _InsightTile(
+                  insight: insight,
+                  onAction: insight.actionLabel == null
+                      ? null
+                      : _showWellnessSuggestions,
+                ),
               ),
             ),
           const SizedBox(height: 12),
@@ -148,6 +155,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
         );
       },
+    );
+  }
+
+  void _showWellnessSuggestions() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _WellnessSuggestionSheet(),
     );
   }
 }
@@ -904,9 +920,10 @@ class _LegendItem extends StatelessWidget {
 }
 
 class _InsightTile extends StatelessWidget {
-  const _InsightTile({required this.insight});
+  const _InsightTile({required this.insight, this.onAction});
 
   final _MoodInsight insight;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -946,13 +963,677 @@ class _InsightTile extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              insight.text,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: const Color(0xFF4E3A50),
-                height: 1.35,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  insight.text,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: const Color(0xFF4E3A50),
+                    height: 1.35,
+                  ),
+                ),
+                if (insight.actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: onAction,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: insight.color.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: insight.color.withValues(alpha: 0.24),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            insight.actionLabel!,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: insight.color,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 15,
+                            color: insight.color,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _WellnessIdea { breathe, ground, move, connect, journal, tinyStep }
+
+class _WellnessSuggestionSheet extends StatefulWidget {
+  const _WellnessSuggestionSheet();
+
+  @override
+  State<_WellnessSuggestionSheet> createState() =>
+      _WellnessSuggestionSheetState();
+}
+
+class _WellnessSuggestionSheetState extends State<_WellnessSuggestionSheet> {
+  _WellnessIdea _selected = _WellnessIdea.breathe;
+  Timer? _timer;
+  int _breatheSeconds = 24;
+  int _moveSeconds = 30;
+
+  bool get _isTimerRunning => _timer != null;
+
+  String get _breatheLabel {
+    if (_breatheSeconds == 0) {
+      return 'Nice work. Let that calm stay with you.';
+    }
+    final elapsed = 24 - _breatheSeconds;
+    return elapsed % 8 < 4 ? 'Breathe in slowly' : 'Breathe out gently';
+  }
+
+  String get _moveLabel {
+    if (_moveSeconds == 0) {
+      return 'Good. Notice if your body feels a little lighter.';
+    }
+    return 'Move gently for $_moveSeconds seconds';
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _selectIdea(_WellnessIdea idea) {
+    _timer?.cancel();
+    setState(() {
+      _selected = idea;
+      _timer = null;
+      _breatheSeconds = 24;
+      _moveSeconds = 30;
+    });
+  }
+
+  void _startTimedReset() {
+    _timer?.cancel();
+    setState(() {
+      if (_selected == _WellnessIdea.breathe) {
+        _breatheSeconds = 24;
+      } else if (_selected == _WellnessIdea.move) {
+        _moveSeconds = 30;
+      }
+    });
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        if (_selected == _WellnessIdea.breathe) {
+          _breatheSeconds = (_breatheSeconds - 1).clamp(0, 24).toInt();
+          if (_breatheSeconds == 0) {
+            timer.cancel();
+            _timer = null;
+          }
+        } else if (_selected == _WellnessIdea.move) {
+          _moveSeconds = (_moveSeconds - 1).clamp(0, 30).toInt();
+          if (_moveSeconds == 0) {
+            timer.cancel();
+            _timer = null;
+          }
+        } else {
+          timer.cancel();
+          _timer = null;
+        }
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.only(top: 80),
+        padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
+        decoration: const BoxDecoration(
+          color: Color(0xFFFFF8FF),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.black12,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
               ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF2A0736),
+                      Color(0xFF64226D),
+                      Color(0xFF9B5A91),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF4A154B).withValues(alpha: 0.18),
+                      blurRadius: 24,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  children: [
+                    const FloatingBubbles(count: 12, opacity: 0.14),
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(
+                            Icons.favorite_rounded,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'A gentle check-in',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Three low moods in a row can feel heavy. Pick one small reset for right now.',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11.5,
+                                  height: 1.35,
+                                  color: Colors.white.withValues(alpha: 0.78),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Choose a tiny reset',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF38143E),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 96,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _WellnessOptionCard(
+                      icon: Icons.air_rounded,
+                      title: 'Breathe',
+                      subtitle: '24 sec',
+                      selected: _selected == _WellnessIdea.breathe,
+                      onTap: () => _selectIdea(_WellnessIdea.breathe),
+                    ),
+                    _WellnessOptionCard(
+                      icon: Icons.spa_rounded,
+                      title: 'Ground',
+                      subtitle: '5 things',
+                      selected: _selected == _WellnessIdea.ground,
+                      onTap: () => _selectIdea(_WellnessIdea.ground),
+                    ),
+                    _WellnessOptionCard(
+                      icon: Icons.accessibility_new_rounded,
+                      title: 'Move',
+                      subtitle: '30 sec',
+                      selected: _selected == _WellnessIdea.move,
+                      onTap: () => _selectIdea(_WellnessIdea.move),
+                    ),
+                    _WellnessOptionCard(
+                      icon: Icons.people_outline_rounded,
+                      title: 'Connect',
+                      subtitle: 'Text one',
+                      selected: _selected == _WellnessIdea.connect,
+                      onTap: () => _selectIdea(_WellnessIdea.connect),
+                    ),
+                    _WellnessOptionCard(
+                      icon: Icons.edit_note_rounded,
+                      title: 'Journal',
+                      subtitle: '1 line',
+                      selected: _selected == _WellnessIdea.journal,
+                      onTap: () => _selectIdea(_WellnessIdea.journal),
+                    ),
+                    _WellnessOptionCard(
+                      icon: Icons.check_circle_outline_rounded,
+                      title: 'Tiny step',
+                      subtitle: 'One task',
+                      selected: _selected == _WellnessIdea.tinyStep,
+                      onTap: () => _selectIdea(_WellnessIdea.tinyStep),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 240),
+                child: _WellnessIdeaPanel(
+                  key: ValueKey(_selected),
+                  idea: _selected,
+                  breatheSeconds: _breatheSeconds,
+                  breatheLabel: _breatheLabel,
+                  moveSeconds: _moveSeconds,
+                  moveLabel: _moveLabel,
+                  isTimerRunning: _isTimerRunning,
+                  onStartTimer: _startTimedReset,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5EDF8),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFE8D8EA)),
+                ),
+                child: Text(
+                  'AURALIA supports wellbeing, but it cannot diagnose or replace professional care. If you feel unsafe or overwhelmed, contact someone you trust or local emergency support.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10.5,
+                    height: 1.4,
+                    color: Colors.black54,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: const Color(0xFF6E2D72),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  child: Text(
+                    'Back to analytics',
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WellnessOptionCard extends StatelessWidget {
+  const _WellnessOptionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 92,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF6E2D72) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? const Color(0xFF6E2D72) : const Color(0xFFE8D8EA),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4A154B).withValues(
+                  alpha: selected ? 0.18 : 0.06,
+                ),
+                blurRadius: selected ? 18 : 12,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                icon,
+                size: 22,
+                color: selected ? Colors.white : const Color(0xFF6E2D72),
+              ),
+              const Spacer(),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? Colors.white : const Color(0xFF38143E),
+                ),
+              ),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 9.5,
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.76)
+                      : Colors.black45,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WellnessIdeaPanel extends StatelessWidget {
+  const _WellnessIdeaPanel({
+    super.key,
+    required this.idea,
+    required this.breatheSeconds,
+    required this.breatheLabel,
+    required this.moveSeconds,
+    required this.moveLabel,
+    required this.isTimerRunning,
+    required this.onStartTimer,
+  });
+
+  final _WellnessIdea idea;
+  final int breatheSeconds;
+  final String breatheLabel;
+  final int moveSeconds;
+  final String moveLabel;
+  final bool isTimerRunning;
+  final VoidCallback onStartTimer;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = switch (idea) {
+      _WellnessIdea.breathe => (
+        Icons.air_rounded,
+        'Try a soft breathing loop',
+        'Inhale for 4 counts, hold for 2, then exhale for 6. Repeat this three times and let your shoulders drop.',
+      ),
+      _WellnessIdea.ground => (
+          Icons.spa_rounded,
+          'Name what is around you',
+          'Find 5 things you can see, 4 you can feel, 3 you can hear, 2 you can smell, and 1 thing you can taste.',
+        ),
+      _WellnessIdea.move => (
+        Icons.accessibility_new_rounded,
+        'Loosen the body first',
+        'Roll your shoulders, stretch your neck gently, and walk slowly for 30 seconds before choosing the next song.',
+      ),
+      _WellnessIdea.connect => (
+          Icons.people_outline_rounded,
+          'Reach one safe person',
+          'Send a simple message such as: I am having a low moment. Can you stay with me for a little while?',
+        ),
+      _WellnessIdea.journal => (
+          Icons.edit_note_rounded,
+          'Write one honest line',
+          'Try: Right now I feel..., and one thing I need is... Keep it short. It does not need to be perfect.',
+        ),
+      _WellnessIdea.tinyStep => (
+          Icons.check_circle_outline_rounded,
+          'Pick one doable step',
+          'Choose one tiny action under two minutes: drink water, sit near light, tidy one item, or open a comforting playlist.',
+        ),
+    };
+
+    return Container(
+      key: key,
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Colors.white, Color(0xFFF8EFF8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE8D8EA)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4A154B).withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 9),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8D8EA),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(content.$1, color: const Color(0xFF6E2D72)),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  content.$2,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF38143E),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  content.$3,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11.5,
+                    height: 1.45,
+                    color: Colors.black54,
+                  ),
+                ),
+                if (idea == _WellnessIdea.breathe ||
+                    idea == _WellnessIdea.move) ...[
+                  const SizedBox(height: 14),
+                  _ResetTimerControl(
+                    secondsRemaining: idea == _WellnessIdea.breathe
+                        ? breatheSeconds
+                        : moveSeconds,
+                    totalSeconds: idea == _WellnessIdea.breathe ? 24 : 30,
+                    label: idea == _WellnessIdea.breathe
+                        ? breatheLabel
+                        : moveLabel,
+                    buttonLabel: _timerButtonLabel,
+                    isRunning: isTimerRunning,
+                    onStart: onStartTimer,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String get _timerButtonLabel {
+    if (idea == _WellnessIdea.breathe) {
+      return breatheSeconds == 0 ? 'Do it again' : 'Start 24 seconds';
+    }
+    return moveSeconds == 0 ? 'Move again' : 'Start 30 seconds';
+  }
+}
+
+class _ResetTimerControl extends StatelessWidget {
+  const _ResetTimerControl({
+    required this.secondsRemaining,
+    required this.totalSeconds,
+    required this.label,
+    required this.buttonLabel,
+    required this.isRunning,
+    required this.onStart,
+  });
+
+  final int secondsRemaining;
+  final int totalSeconds;
+  final String label;
+  final String buttonLabel;
+  final bool isRunning;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (totalSeconds - secondsRemaining) / totalSeconds;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5EDF8),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 58,
+            height: 58,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: isRunning || secondsRemaining == 0 ? progress : 0,
+                  strokeWidth: 5,
+                  backgroundColor: const Color(0xFFE2D1DF),
+                  valueColor: const AlwaysStoppedAnimation(Color(0xFF6E2D72)),
+                ),
+                Text(
+                  '${secondsRemaining}s',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF38143E),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF38143E),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 34,
+                  child: ElevatedButton(
+                    onPressed: isRunning ? null : onStart,
+                    style: ElevatedButton.styleFrom(
+                      elevation: 0,
+                      backgroundColor: const Color(0xFF6E2D72),
+                      disabledBackgroundColor: const Color(0xFFE2D1DF),
+                      foregroundColor: Colors.white,
+                      disabledForegroundColor: const Color(0xFF6E2D72),
+                      padding: const EdgeInsets.symmetric(horizontal: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    child: Text(
+                      isRunning ? 'In progress...' : buttonLabel,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1556,6 +2237,7 @@ class _MoodAnalytics {
         text: repeatedLowMood
             ? 'Your last three entries were low moods. Consider a short reset or speaking with someone you trust.'
             : 'No repeated low-mood pattern was detected in your latest entries.',
+        actionLabel: repeatedLowMood ? 'View reset ideas' : null,
       ),
     );
 
@@ -1650,11 +2332,13 @@ class _MoodInsight {
     required this.icon,
     required this.color,
     required this.text,
+    this.actionLabel,
   });
 
   final IconData icon;
   final Color color;
   final String text;
+  final String? actionLabel;
 }
 
 Color _moodColor(AuraliaMood mood) {

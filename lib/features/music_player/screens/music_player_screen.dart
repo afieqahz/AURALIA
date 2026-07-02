@@ -48,6 +48,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
   bool _isAdvancingTrack = false;
   bool _hasSpotifyStateForTrack = false;
   bool _isShowingPostListeningCheckIn = false;
+  bool _hasCompletedPlaylist = false;
   int _completedPlaybackRequestId = -1;
 
   bool get _shouldShowPlaybackMessage =>
@@ -92,6 +93,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
       _isConnectingSpotify = false;
       _playbackMessage = null;
       _hasSpotifyStateForTrack = false;
+      _hasCompletedPlaylist = false;
       if (_isViewingPlayback) {
         _isPlaying = state.isPlaybackPlaying;
         _isSpotifyPlayback =
@@ -114,6 +116,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
         return;
       }
       _completedPlaybackRequestId = -1;
+      _hasCompletedPlaylist = false;
       _activeTrackIndex = 0;
       _isViewingPlayback = true;
       _playActiveTrack();
@@ -167,40 +170,10 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
             ],
           ),
           const SizedBox(height: 20),
-          Container(
-            width: double.infinity,
-            height: MediaQuery.of(context).size.height * 0.32,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFAC7099), Color(0xFF5A2C62)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF5A2C62).withValues(alpha: 0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: artworkUrl == null
-                ? const Icon(
-                    Icons.music_note_rounded,
-                    size: 100,
-                    color: Colors.white,
-                  )
-                : Image.network(
-                    artworkUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const Icon(
-                      Icons.music_note_rounded,
-                      size: 100,
-                      color: Colors.white,
-                    ),
-                  ),
+          _NowPlayingArtworkCard(
+            artworkUrl: artworkUrl,
+            isPlaying: _isPlaying,
+            controller: _waveformController,
           ),
           const SizedBox(height: 28),
           Text(
@@ -217,6 +190,12 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(fontSize: 14, color: Colors.black45),
           ),
+          const SizedBox(height: 12),
+          _PlaybackMoodPill(
+            isPlaying: _isPlaying,
+            isConnecting: _isConnectingSpotify,
+            isSpotifyPlayback: _isSpotifyPlayback,
+          ),
           if (_shouldShowPlaybackMessage) ...[
             const SizedBox(height: 12),
             _PlaybackFallbackPanel(
@@ -229,7 +208,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
               onOpenSpotify: () => _openInSpotify(activeTrack),
             ),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           _PlayerWaveform(
             controller: _waveformController,
             isPlaying: _isPlaying,
@@ -288,46 +267,14 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
             ],
           ),
           const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.skip_previous_rounded,
-                  size: 36,
-                  color: Color(0xFF38143E),
-                ),
-                onPressed: _playPrevious,
-              ),
-              const SizedBox(width: 20),
-              CircleAvatar(
-                radius: 36,
-                backgroundColor: const Color(0xFF5A2C62),
-                child: IconButton(
-                  icon: Icon(
-                    _isConnectingSpotify
-                        ? Icons.more_horiz_rounded
-                        : _isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                    size: 36,
-                    color: Colors.white,
-                  ),
-                  onPressed: _isConnectingSpotify
-                      ? null
-                      : () => _togglePlayback(activeTrack),
-                ),
-              ),
-              const SizedBox(width: 20),
-              IconButton(
-                icon: const Icon(
-                  Icons.skip_next_rounded,
-                  size: 36,
-                  color: Color(0xFF38143E),
-                ),
-                onPressed: _playNext,
-              ),
-            ],
+          _PlayerControlDeck(
+            isPlaying: _isPlaying,
+            isConnecting: _isConnectingSpotify,
+            onPrevious: _playPrevious,
+            onToggle: _isConnectingSpotify
+                ? null
+                : () => _togglePlayback(activeTrack),
+            onNext: _playNext,
           ),
           const SizedBox(height: 28),
           Align(
@@ -371,6 +318,11 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
           isPlaying: false,
         );
       }
+      return;
+    }
+
+    if (_hasCompletedPlaylist) {
+      await _restartCompletedPlaylist();
       return;
     }
 
@@ -506,6 +458,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
     if (playlist.tracks.isEmpty) {
       return;
     }
+    _hasCompletedPlaylist = false;
     state.activateCurrentPlaylistForPlayback(
       activeTrackIndex: _activeTrackIndex,
     );
@@ -814,6 +767,27 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
     }
   }
 
+  Future<void> _restartCompletedPlaylist() async {
+    _stopSpotifyTimer();
+    await _audioPlayer.stop();
+    if (_isSpotifyPlayback) {
+      await _spotifyPlaybackService.pause();
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _hasCompletedPlaylist = false;
+      _completedPlaybackRequestId = -1;
+      _activeTrackIndex = 0;
+      _spotifyPosition = Duration.zero;
+      _hasSpotifyStateForTrack = false;
+      _expectedSpotifyUri = null;
+      _loadedPreviewUrl = null;
+    });
+    await _playActiveTrack();
+  }
+
   Future<void> _finishPlaylistAndRequestCheckIn() async {
     final state = AuraliaScope.of(context);
     final requestId = state.playbackRequestId;
@@ -836,6 +810,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
     }
     setState(() {
       _isPlaying = false;
+      _hasCompletedPlaylist = true;
       _spotifyPosition = _spotifyDuration;
     });
     state.updatePlaybackState(
@@ -1195,6 +1170,287 @@ class _PlaybackFallbackPanel extends StatelessWidget {
   }
 }
 
+class _NowPlayingArtworkCard extends StatelessWidget {
+  const _NowPlayingArtworkCard({
+    required this.artworkUrl,
+    required this.isPlaying,
+    required this.controller,
+  });
+
+  final String? artworkUrl;
+  final bool isPlaying;
+  final Animation<double> controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        final glow = isPlaying
+            ? 0.22 + (math.sin(controller.value * math.pi * 2).abs() * 0.14)
+            : 0.14;
+        final screenWidth = MediaQuery.sizeOf(context).width;
+        final artworkSize = math.min(screenWidth - 64, 292.0);
+        return Center(
+          child: Container(
+            width: artworkSize,
+            height: artworkSize,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              color: const Color(0xFFF4E7F4),
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF5A2C62).withValues(alpha: glow),
+                  blurRadius: isPlaying ? 40 : 24,
+                  spreadRadius: isPlaying ? 2 : 0,
+                  offset: const Offset(0, 18),
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  blurRadius: 18,
+                  offset: const Offset(-8, -8),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Color(0xFFB66BA2),
+                          Color(0xFF6E2D72),
+                          Color(0xFF2A0736),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: artworkUrl == null
+                      ? const Icon(
+                          Icons.music_note_rounded,
+                          size: 92,
+                          color: Colors.white,
+                        )
+                      : Image.network(
+                          artworkUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const Icon(
+                            Icons.music_note_rounded,
+                            size: 92,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+                if (isPlaying)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.28),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PlaybackMoodPill extends StatelessWidget {
+  const _PlaybackMoodPill({
+    required this.isPlaying,
+    required this.isConnecting,
+    required this.isSpotifyPlayback,
+  });
+
+  final bool isPlaying;
+  final bool isConnecting;
+  final bool isSpotifyPlayback;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = isConnecting
+        ? 'Connecting your music'
+        : isPlaying
+        ? isSpotifyPlayback
+              ? 'Full track playing'
+              : 'Preview playing'
+        : 'Ready when you are';
+    final icon = isConnecting
+        ? Icons.sync_rounded
+        : isPlaying
+        ? Icons.graphic_eq_rounded
+        : Icons.nightlight_round;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE3D4E5)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4A154B).withValues(alpha: 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF4EAF5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 12, color: const Color(0xFF6E2D72)),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF5A2C62),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlayerControlDeck extends StatelessWidget {
+  const _PlayerControlDeck({
+    required this.isPlaying,
+    required this.isConnecting,
+    required this.onPrevious,
+    required this.onToggle,
+    required this.onNext,
+  });
+
+  final bool isPlaying;
+  final bool isConnecting;
+  final VoidCallback onPrevious;
+  final VoidCallback? onToggle;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFE8D8EA)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4A154B).withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _RoundControlButton(
+            icon: Icons.skip_previous_rounded,
+            onTap: onPrevious,
+            isPrimary: false,
+          ),
+          const SizedBox(width: 22),
+          Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF7D3B84), Color(0xFF4A154B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF5A2C62).withValues(alpha: 0.28),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: Icon(
+                isConnecting
+                    ? Icons.more_horiz_rounded
+                    : isPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
+                size: 38,
+                color: Colors.white,
+              ),
+              onPressed: onToggle,
+            ),
+          ),
+          const SizedBox(width: 22),
+          _RoundControlButton(
+            icon: Icons.skip_next_rounded,
+            onTap: onNext,
+            isPrimary: false,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoundControlButton extends StatelessWidget {
+  const _RoundControlButton({
+    required this.icon,
+    required this.onTap,
+    required this.isPrimary,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isPrimary;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: isPrimary ? const Color(0xFF5A2C62) : const Color(0xFFF4EAF5),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          color: isPrimary ? Colors.white : const Color(0xFF38143E),
+          size: 30,
+        ),
+      ),
+    );
+  }
+}
+
 class _PlayerWaveform extends StatelessWidget {
   const _PlayerWaveform({
     required this.controller,
@@ -1379,16 +1635,33 @@ class _TrackTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFFEBDDEC) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          gradient: isActive
+              ? const LinearGradient(
+                  colors: [Color(0xFFF0DFF2), Color(0xFFFFFFFF)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                )
+              : null,
+          color: isActive ? null : Colors.white,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isActive ? const Color(0xFF5A2C62) : Colors.transparent,
+            color: isActive ? const Color(0xFF8C4B8F) : const Color(0xFFF0E8F1),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4A154B).withValues(
+                alpha: isActive ? 0.12 : 0.04,
+              ),
+              blurRadius: isActive ? 18 : 12,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -1427,16 +1700,40 @@ class _TrackTile extends StatelessWidget {
                 children: [
                   Text(
                     track.title,
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF38143E),
+                    ),
                   ),
                   Text(
                     track.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       color: Colors.black45,
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: isActive
+                    ? const Color(0xFF6E2D72)
+                    : const Color(0xFFF4EAF5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isActive ? Icons.graphic_eq_rounded : Icons.play_arrow_rounded,
+                size: 18,
+                color: isActive ? Colors.white : const Color(0xFF6E2D72),
               ),
             ),
           ],
