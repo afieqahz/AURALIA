@@ -164,12 +164,9 @@ class _AnalyticsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mood = analytics.dominantMood;
-    final hasEntries = analytics.entries.isNotEmpty;
-
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF2A0736), Color(0xFF64226D), Color(0xFF9B5A91)],
@@ -185,162 +182,42 @@ class _AnalyticsHeader extends StatelessWidget {
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -34,
-            top: -38,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.08),
-              ),
-            ),
-          ),
-          Positioned(
-            left: -48,
-            bottom: -62,
-            child: Container(
-              width: 155,
-              height: 155,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFF09EE6).withValues(alpha: 0.11),
-              ),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.16),
-                      ),
-                    ),
-                    child: Icon(
-                      hasEntries ? _moodIcon(mood) : Icons.auto_graph_rounded,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Mood Analytics',
-                          style: GoogleFonts.poppins(
-                            fontSize: 23,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          range == _AnalyticsRange.weekly
-                              ? 'Your emotional pattern this week'
-                              : 'Your emotional pattern this month',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.74),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _RangeSelector(value: range, onChanged: onRangeChanged),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          hasEntries ? analytics.baselineLabel : 'No data yet',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          hasEntries
-                              ? '${analytics.totalMoodEntries} mood entries recorded'
-                              : 'Record a mood to unlock your report',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.72),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  _HeaderSparkline(buckets: analytics.buckets),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderSparkline extends StatelessWidget {
-  const _HeaderSparkline({required this.buckets});
-
-  final List<_MoodBucket> buckets;
-
-  @override
-  Widget build(BuildContext context) {
-    final maxCount = buckets.fold<int>(
-      1,
-      (max, bucket) => bucket.total > max ? bucket.total : max,
-    );
-
-    return SizedBox(
-      width: 74,
-      height: 42,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(buckets.length > 7 ? 7 : buckets.length, (index) {
-          final bucket = buckets[index];
-          final height = bucket.total == 0
-              ? 8.0
-              : 10 + (30 * bucket.total / maxCount);
-          return TweenAnimationBuilder<double>(
-            tween: Tween(begin: 8, end: height),
-            duration: Duration(milliseconds: 420 + index * 55),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) => Container(
-              width: 6,
-              height: value,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(
-                  alpha: bucket.total == 0 ? 0.24 : 0.76,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mood Analytics',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(99),
-              ),
+                const SizedBox(height: 5),
+                Text(
+                  range == _AnalyticsRange.weekly
+                      ? 'Your emotional pattern this week'
+                      : 'Your emotional pattern this month',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    height: 1.25,
+                    color: Colors.white.withValues(alpha: 0.78),
+                  ),
+                ),
+              ],
             ),
-          );
-        }),
+          ),
+          const SizedBox(width: 14),
+          _RangeSelector(value: range, onChanged: onRangeChanged),
+        ],
       ),
     );
   }
@@ -1264,18 +1141,6 @@ class _MetricCard extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            Positioned(
-              right: -28,
-              top: -32,
-              child: Container(
-                width: 86,
-                height: 86,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.34),
-                ),
-              ),
-            ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
