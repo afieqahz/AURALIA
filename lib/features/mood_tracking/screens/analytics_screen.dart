@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auralia_app/core/models/mood.dart';
 import 'package:auralia_app/core/services/auralia_scope.dart';
+import 'package:auralia_app/core/widgets/floating_bubbles.dart';
 
 enum _AnalyticsRange { weekly, monthly }
 
@@ -182,39 +183,45 @@ class _AnalyticsHeader extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          Text(
-            'Mood Analytics',
-            maxLines: 1,
-            overflow: TextOverflow.visible,
-            style: GoogleFonts.poppins(
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          const FloatingBubbles(count: 14, opacity: 0.16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  range == _AnalyticsRange.weekly
-                      ? 'Your emotional pattern this week'
-                      : 'Your emotional pattern this month',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    height: 1.25,
-                    color: Colors.white.withValues(alpha: 0.78),
-                  ),
+              Text(
+                'Mood Analytics',
+                maxLines: 1,
+                overflow: TextOverflow.visible,
+                style: GoogleFonts.poppins(
+                  fontSize: 23,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(width: 12),
-              _RangeSelector(value: range, onChanged: onRangeChanged),
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Text(
+                      range == _AnalyticsRange.weekly
+                          ? 'Your emotional pattern this week'
+                          : 'Your emotional pattern this month',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        height: 1.25,
+                        color: Colors.white.withValues(alpha: 0.78),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _RangeSelector(value: range, onChanged: onRangeChanged),
+                ],
+              ),
             ],
           ),
         ],
@@ -805,11 +812,19 @@ class _MoodBucketPopup extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${bucket.label} entries',
+            bucket.label,
             style: GoogleFonts.poppins(
               fontSize: 10,
               fontWeight: FontWeight.w700,
               color: const Color(0xFF38143E),
+            ),
+          ),
+          Text(
+            'Entries:',
+            style: GoogleFonts.poppins(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: Colors.black54,
             ),
           ),
           const SizedBox(height: 5),
@@ -1173,14 +1188,20 @@ class _MetricCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF38143E),
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      value,
+                      maxLines: 1,
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF38143E),
+                      ),
+                    ),
                   ),
                 ),
               ],

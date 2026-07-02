@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auralia_app/core/models/playlist.dart';
 import 'package:auralia_app/core/services/auralia_scope.dart';
+import 'package:auralia_app/core/widgets/floating_bubbles.dart';
 import 'package:auralia_app/features/mood_tracking/screens/auralia_chat_screen.dart';
 
 class HomeDashboardScreen extends StatefulWidget {
@@ -308,28 +309,7 @@ class _AuraliaHeroCardState extends State<_AuraliaHeroCard>
         ),
         child: Stack(
           children: [
-            Positioned(
-              left: -28,
-              top: -34,
-              child: _AnimatedHeroBubble(
-                controller: _pulseController,
-                size: 112,
-                color: Colors.white.withValues(alpha: 0.07),
-                dx: 10,
-                dy: 8,
-              ),
-            ),
-            Positioned(
-              right: -36,
-              bottom: -40,
-              child: _AnimatedHeroBubble(
-                controller: _pulseController,
-                size: 142,
-                color: const Color(0xFFF09EE6).withValues(alpha: 0.12),
-                dx: -12,
-                dy: -10,
-              ),
-            ),
+            const FloatingBubbles(count: 16, opacity: 0.16),
             Positioned(
               left: 22,
               top: 18,
@@ -450,44 +430,6 @@ class _AuraliaHeroCardState extends State<_AuraliaHeroCard>
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _AnimatedHeroBubble extends StatelessWidget {
-  const _AnimatedHeroBubble({
-    required this.controller,
-    required this.size,
-    required this.color,
-    required this.dx,
-    required this.dy,
-  });
-
-  final Animation<double> controller;
-  final double size;
-  final Color color;
-  final double dx;
-  final double dy;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
-        final wave = controller.value * 2 - 1;
-        return Transform.translate(
-          offset: Offset(dx * wave, dy * wave),
-          child: Transform.scale(
-            scale: 1 + (controller.value * 0.08),
-            child: child,
-          ),
-        );
-      },
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       ),
     );
   }
