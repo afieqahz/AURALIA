@@ -88,6 +88,7 @@ async def _spotify_token() -> dict[str, Any]:
 async def spotify_search(
     q: str = Query(..., min_length=1),
     allow_fallback: bool = Query(True),
+     mood: str = Query("neutral")
 ) -> dict[str, Any]:
     cache_key = f"{q.strip().lower()}|fallback={allow_fallback}"
     cached = _spotify_search_cache.get(cache_key)
