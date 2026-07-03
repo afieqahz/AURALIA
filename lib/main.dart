@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:auralia_app/core/services/auralia_scope.dart';
 import 'package:auralia_app/core/services/auralia_state.dart';
 import 'package:auralia_app/core/services/post_listening_notification_service.dart';
+import 'package:auralia_app/shared/widgets/connectivity_overlay.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -101,6 +102,7 @@ class _MyAppState extends State<MyApp> {
         textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme),
       ),
       home: const SplashScreen(),
+      builder: (context, child) => ConnectivityOverlay(child: child),
     );
   }
 }
