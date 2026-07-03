@@ -238,6 +238,20 @@ class _AnalyticsHeader extends StatelessWidget {
                   _RangeSelector(value: range, onChanged: onRangeChanged),
                 ],
               ),
+              if (range == _AnalyticsRange.weekly) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Week runs Sunday to Saturday, so totals may include a few days from the previous month.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    height: 1.2,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.white.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
             ],
           ),
         ],
