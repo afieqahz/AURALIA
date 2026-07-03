@@ -104,7 +104,7 @@ async def spotify_search(
     items = data.get("tracks", {}).get("items", [])
 
     ranked_items = _rank_mainstream_tracks(items)
-    data.setdefault("tracks", {})["items"] = ranked_items[:80]
+    data.setdefault("tracks", {})["items"] = ranked_items[:30]
     data["tracks"]["limit"] = min(80, len(ranked_items))
     data["tracks"]["total"] = len(ranked_items)
     data["auralia_source"] = data.get("auralia_source", "spotify_api")
@@ -188,7 +188,7 @@ async def _spotify_track_search(
             if query.strip()
         )
     )[:2]
-    offsets = (0, _spotify_search_limit)[:2]
+    offsets = (0,)
 
     first_response_body: dict[str, Any] | None = None
 
@@ -676,14 +676,34 @@ def _album_images(image_url: Any) -> list[dict[str, Any]]:
 
 
 def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    seen: set[str] = set()
+    """
+    Removes duplicate songs (album/single/deluxe versions),
+    filters low-quality tracks,
+    then ranks by popularity + recency.
+    """
+
+    seen_tracks: set[tuple[str, str]] = set()
     unique_items: list[dict[str, Any]] = []
 
     for item in items:
-        track_id = str(item.get("id", ""))
-        if not track_id or track_id in seen:
+
+        if not item.get("id"):
             continue
-        seen.add(track_id)
+
+        title = item.get("name", "").lower().strip()
+
+        artists = item.get("artists", [])
+        artist = ""
+
+        if artists:
+            artist = artists[0].get("name", "").lower().strip()
+
+        key = (title, artist)
+
+        if key in seen_tracks:
+            continue
+
+        seen_tracks.add(key)
         unique_items.append(item)
 
     playable = [
@@ -695,12 +715,20 @@ def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]
         and _looks_like_real_song(item)
     ]
 
+    def score(track):
+
+        popularity = track.get("popularity") or 0
+
+        try:
+            year = int(track.get("album", {}).get("release_date", "")[:4])
+        except:
+            year = 2023
+
+        return popularity * 5 + (year - 2023) * 8
+
     ranked = sorted(
         playable,
-        key=lambda item: (
-            int(item.get("popularity") or 0),
-            int(item.get("album", {}).get("release_date", "0")[:4] or 0),
-        ),
+        key=score,
         reverse=True,
     )
 
@@ -732,7 +760,7 @@ def _looks_like_real_song(item: dict[str, Any]) -> bool:
         return False
 
     popularity = item.get("popularity")
-    if isinstance(popularity, int) and popularity < 35:
+    if isinstance(popularity, int) and popularity < 55:
         return False
 
     text_parts = [
@@ -769,13 +797,5 @@ def _looks_like_real_song(item: dict[str, Any]) -> bool:
     }
     return not any(term in searchable for term in blocked_terms)
 
-
 def _constrain_spotify_query(query: str) -> str:
-    query = query.strip()
-    if not query:
-        return query
-
-    lowered = query.lower()
-    if "english" not in lowered:
-        query = f"english {query}"
-    return query
+    return query.strip()
