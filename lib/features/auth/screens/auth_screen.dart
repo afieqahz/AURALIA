@@ -413,7 +413,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     : (val) => setState(() => acceptTerms = val ?? false),
                 activeColor: const Color(0xFF4A154B),
                 side: BorderSide(
-                  color: const Color(0xFF4A154B).withValues(alpha: 0.45),
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
               ),
             ),
