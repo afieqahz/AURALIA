@@ -1,10 +1,12 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:auralia_app/core/services/app_ready_notifier.dart';
 import 'package:auralia_app/core/services/auralia_scope.dart';
+import 'package:auralia_app/core/services/connectivity_watcher.dart';
 import 'package:auralia_app/features/auth/widgets/ambient_background.dart';
 import 'package:auralia_app/features/home/screens/main_layout.dart';
+import 'package:auralia_app/shared/widgets/connection_error_card.dart';
 import 'auth_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -72,7 +74,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _openNextScreen() async {
-    if (!await _hasInternetConnection()) {
+    if (!await ConnectivityWatcher.hasInternetConnection()) {
       if (mounted) {
         setState(() {
           _isOffline = true;
@@ -106,6 +108,8 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
+    AppReadyNotifier.instance.value = true;
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
@@ -116,17 +120,6 @@ class _SplashScreenState extends State<SplashScreen>
         transitionDuration: const Duration(milliseconds: 800),
       ),
     );
-  }
-
-  Future<bool> _hasInternetConnection() async {
-    try {
-      final result = await InternetAddress.lookup(
-        'supabase.co',
-      ).timeout(const Duration(seconds: 4));
-      return result.isNotEmpty && result.first.rawAddress.isNotEmpty;
-    } on Object {
-      return false;
-    }
   }
 
   Future<void> _retryConnection() async {
@@ -256,7 +249,7 @@ class _SplashScreenState extends State<SplashScreen>
                             ),
                             if (_isOffline) ...[
                               const SizedBox(height: 28),
-                              _ConnectionErrorCard(
+                              ConnectionErrorCard(
                                 isRetrying: _isRetryingConnection,
                                 onRetry: _retryConnection,
                               ),
@@ -301,104 +294,6 @@ class _SplashEqualizer extends StatelessWidget {
             ),
           );
         }),
-      ),
-    );
-  }
-}
-
-class _ConnectionErrorCard extends StatelessWidget {
-  const _ConnectionErrorCard({
-    required this.isRetrying,
-    required this.onRetry,
-  });
-
-  final bool isRetrying;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 22,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.20),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.wifi_off_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Connection error',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'AURALIA needs internet to sync your account, playlists, and Spotify tracks.',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              height: 1.45,
-              color: Colors.white.withValues(alpha: 0.76),
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 46,
-            child: FilledButton.icon(
-              onPressed: isRetrying ? null : onRetry,
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.white,
-                disabledBackgroundColor: Colors.white.withValues(alpha: 0.42),
-                foregroundColor: const Color(0xFF4A154B),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              icon: isRetrying
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF4A154B),
-                      ),
-                    )
-                  : const Icon(Icons.refresh_rounded),
-              label: Text(
-                isRetrying ? 'Checking...' : 'Try again',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w800),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
