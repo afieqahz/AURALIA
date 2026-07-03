@@ -106,9 +106,14 @@ async def spotify_search(
     items = data.get("tracks", {}).get("items", [])
 
     ranked_items = _rank_mainstream_tracks(items)
-    ranked_items = _dedupe_tracks(ranked_items)
-    iso_playlist = _build_iso_playlist(ranked_items[:30], mood)
+    ranked_items = sorted(
+    ranked_items,
+    key=lambda t: _mood_boost(t, mood),
+    reverse=True
+)
 
+    ranked_items = _dedupe_tracks(ranked_items)
+   
     data["tracks"] = {
         "href": data.get("tracks", {}).get("href", ""),
         "limit": 30,
@@ -684,6 +689,26 @@ def _album_images(image_url: Any) -> list[dict[str, Any]]:
         {"url": image_url, "height": 300, "width": 300},
         {"url": image_url, "height": 64, "width": 64},
     ]
+
+def _mood_boost(track: dict[str, Any], mood: str) -> float:
+    text = (
+        str(track.get("name", "")) + " " +
+        " ".join(a.get("name", "") for a in track.get("artists", []))
+    ).lower()
+
+    if mood == "sad":
+        keywords = ["love", "cry", "alone", "heart", "pain", "stay", "goodbye"]
+        return 3.0 if any(k in text for k in keywords) else 1.0
+
+    if mood == "motivated":
+        keywords = ["fire", "run", "win", "power", "strong", "rise", "fight"]
+        return 3.0 if any(k in text for k in keywords) else 1.0
+
+    if mood == "happy":
+        keywords = ["happy", "dance", "love", "sun", "smile"]
+        return 3.0 if any(k in text for k in keywords) else 1.0
+
+    return 1.0
 
 def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
