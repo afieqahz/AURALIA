@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import re
 import os
 import time
 from typing import Any
@@ -104,12 +105,17 @@ async def spotify_search(
     items = data.get("tracks", {}).get("items", [])
 
     ranked_items = _rank_mainstream_tracks(items)
-    data.setdefault("tracks", {})["items"] = ranked_items[:30]
-    data["tracks"]["limit"] = min(80, len(ranked_items))
-    data["tracks"]["total"] = len(ranked_items)
-    data["auralia_source"] = data.get("auralia_source", "spotify_api")
-    print(f"AURALIA Spotify search source={data['auralia_source']} query={q}")
 
+    iso_playlist = _build_iso_playlist(ranked_items[:30])
+
+    data["tracks"] = {
+        "href": data.get("tracks", {}).get("href", ""),
+        "limit": 30,
+        "total": len(ranked_items),
+        "items": ranked_items[:30],
+        "iso_sequence": iso_playlist
+    }
+    
     if data.get("auralia_error") == "rate_limited":
         _spotify_search_cache[cache_key] = (
             now + _spotify_rate_limit_cache_ttl,
@@ -369,28 +375,32 @@ async def _fallback_spotify_search(query: str) -> dict[str, Any]:
     catalog = _fallback_catalog_for_query(query_lower)
     image_urls = await _spotify_oembed_images([track["id"] for track in catalog])
 
+    tracks = [
+        _fallback_track_json(
+            {
+                **track,
+                "image_url": image_urls.get(track["id"]),
+            },
+            index,
+        )
+        for index, track in enumerate(catalog)
+    ]
+
+    iso_sequence = _build_iso_playlist(tracks)
+
     return {
         "auralia_source": "fallback",
         "tracks": {
             "href": "",
-            "limit": len(catalog),
+            "limit": len(tracks),
             "next": None,
             "offset": 0,
             "previous": None,
-            "total": len(catalog),
-            "items": [
-                _fallback_track_json(
-                    {
-                        **track,
-                        "image_url": image_urls.get(track["id"]),
-                    },
-                    index,
-                )
-                for index, track in enumerate(catalog)
-            ],
+            "total": len(tracks),
+            "items": tracks,
+            "iso_sequence": iso_sequence
         }
     }
-
 
 def _expand_fallback_catalog(catalog: list[dict[str, Any]]) -> list[dict[str, Any]]:
     expanded: list[dict[str, Any]] = []
@@ -698,7 +708,10 @@ def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]
         if artists:
             artist = artists[0].get("name", "").lower().strip()
 
-        key = (title, artist)
+        def normalize(text: str) -> str:
+            return re.sub(r'[^a-z0-9]', '', text.lower())
+
+            key = (normalize(title), normalize(artist))
 
         if key in seen_tracks:
             continue
@@ -724,7 +737,7 @@ def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]
         except:
             year = 2023
 
-        return popularity * 5 + (year - 2023) * 8
+        return popularity * 10 + max(0, (year - 2018) * 3)
 
     ranked = sorted(
         playable,
@@ -734,6 +747,29 @@ def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]
 
     return ranked
 
+def _build_iso_playlist(tracks: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """
+    Splits ranked tracks into ISO phases:
+    validation → transition → elevation
+    """
+
+    if not tracks:
+        return {
+            "validation": [],
+            "transition": [],
+            "elevation": []
+        }
+
+    total = len(tracks)
+
+    validation_end = max(1, total // 3)
+    transition_end = max(validation_end + 1, (total * 2) // 3)
+
+    return {
+        "validation": tracks[:validation_end],
+        "transition": tracks[validation_end:transition_end],
+        "elevation": tracks[transition_end:]
+    }
 
 def _release_year_is_allowed(item: dict[str, Any]) -> bool:
     release_date = str(item.get("album", {}).get("release_date", ""))
@@ -760,7 +796,15 @@ def _looks_like_real_song(item: dict[str, Any]) -> bool:
         return False
 
     popularity = item.get("popularity")
-    if isinstance(popularity, int) and popularity < 55:
+    if isinstance(popularity, int) and popularity < 65:
+        return False
+        
+    junk_keywords = {
+    "bgm", "lofi", "lo-fi", "study", "relaxing music",
+    "instrumental", "beat", "type beat", "ambient"
+    }
+
+    if any(word in searchable for word in junk_keywords):
         return False
 
     text_parts = [
