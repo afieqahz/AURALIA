@@ -29,7 +29,7 @@ _spotify_search_cache_ttl = 60 * 60 * 6
 _spotify_rate_limit_cache_ttl = 60
 _spotify_image_cache: dict[str, str] = {}
 _spotify_search_limit = 50
-_min_release_year = 2025
+_min_release_year = 2010
 _max_release_year = 2026
 
 
@@ -105,8 +105,8 @@ async def spotify_search(
     items = data.get("tracks", {}).get("items", [])
 
     ranked_items = _rank_mainstream_tracks(items)
-
-    iso_playlist = _build_iso_playlist(ranked_items[:30])
+    ranked_items = _dedupe_tracks(ranked_items)
+    iso_playlist = _build_iso_playlist(ranked_items[:30], mood)
 
     data["tracks"] = {
         "href": data.get("tracks", {}).get("href", ""),
@@ -684,7 +684,6 @@ def _album_images(image_url: Any) -> list[dict[str, Any]]:
         {"url": image_url, "height": 64, "width": 64},
     ]
 
-
 def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Removes duplicate songs (album/single/deluxe versions),
@@ -692,26 +691,27 @@ def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]
     then ranks by popularity + recency.
     """
 
+    def normalize(text: str) -> str:
+        return re.sub(r'[^a-z0-9]', '', (text or "").lower())
+
     seen_tracks: set[tuple[str, str]] = set()
     unique_items: list[dict[str, Any]] = []
 
     for item in items:
+        if not isinstance(item, dict):
+            continue
 
         if not item.get("id"):
             continue
 
-        title = item.get("name", "").lower().strip()
+        title = item.get("name", "")
+        artists = item.get("artists") or []
 
-        artists = item.get("artists", [])
         artist = ""
+        if isinstance(artists, list) and artists:
+            artist = artists[0].get("name", "")
 
-        if artists:
-            artist = artists[0].get("name", "").lower().strip()
-
-        def normalize(text: str) -> str:
-            return re.sub(r'[^a-z0-9]', '', text.lower())
-
-            key = (normalize(title), normalize(artist))
+        key = (normalize(title), normalize(artist))
 
         if key in seen_tracks:
             continue
@@ -728,47 +728,56 @@ def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]
         and _looks_like_real_song(item)
     ]
 
-    def score(track):
-
+    def score(track: dict[str, Any]) -> float:
         popularity = track.get("popularity") or 0
 
         try:
             year = int(track.get("album", {}).get("release_date", "")[:4])
-        except:
+        except Exception:
             year = 2023
 
-        return popularity * 10 + max(0, (year - 2018) * 3)
+        # slightly more stable weighting
+        return popularity * 10 + max(0, (year - 2018) * 2)
 
-    ranked = sorted(
-        playable,
-        key=score,
-        reverse=True,
-    )
+    return sorted(playable, key=score, reverse=True)
 
-    return ranked
+def _dedupe_tracks(tracks):
+    seen = set()
+    result = []
 
-def _build_iso_playlist(tracks: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    """
-    Splits ranked tracks into ISO phases:
-    validation → transition → elevation
-    """
+    for t in tracks:
+        key = t.get("id")
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(t)
 
+    return result
+
+def _build_iso_playlist(tracks, mood: str):
     if not tracks:
-        return {
-            "validation": [],
-            "transition": [],
-            "elevation": []
-        }
+        return {"validation": [], "transition": [], "elevation": []}
 
-    total = len(tracks)
+    if mood in ["sad", "stressed"]:
+        v, t, e = 0.5, 0.3, 0.2
+    elif mood == "neutral":
+        v, t, e = 0.33, 0.33, 0.34
+    elif mood == "happy":
+        v, t, e = 0.2, 0.4, 0.4
+    elif mood == "motivated":
+        v, t, e = 0.1, 0.2, 0.7
+    else:
+        v, t, e = 0.33, 0.33, 0.34
 
-    validation_end = max(1, total // 3)
-    transition_end = max(validation_end + 1, (total * 2) // 3)
+    n = len(tracks)
+
+    v_end = int(n * v)
+    t_end = int(n * (v + t))
 
     return {
-        "validation": tracks[:validation_end],
-        "transition": tracks[validation_end:transition_end],
-        "elevation": tracks[transition_end:]
+        "validation": tracks[:v_end],
+        "transition": tracks[v_end:t_end],
+        "elevation": tracks[t_end:]
     }
 
 def _release_year_is_allowed(item: dict[str, Any]) -> bool:
@@ -782,6 +791,7 @@ def _release_year_is_allowed(item: dict[str, Any]) -> bool:
 
 def _looks_like_real_song(item: dict[str, Any]) -> bool:
     duration_ms = item.get("duration_ms")
+
     if isinstance(duration_ms, (int, float)):
         if duration_ms < 90_000 or duration_ms > 8 * 60_000:
             return False
@@ -795,51 +805,35 @@ def _looks_like_real_song(item: dict[str, Any]) -> bool:
     if not images:
         return False
 
-    popularity = item.get("popularity")
-    if isinstance(popularity, int) and popularity < 65:
-        return False
-        
-    junk_keywords = {
-    "bgm", "lofi", "lo-fi", "study", "relaxing music",
-    "instrumental", "beat", "type beat", "ambient"
-    }
-
-    if any(word in searchable for word in junk_keywords):
-        return False
-
     text_parts = [
         str(item.get("name", "")),
         str(album.get("name", "")) if isinstance(album, dict) else "",
         " ".join(
-            str(artist.get("name", ""))
-            for artist in artists
-            if isinstance(artist, dict)
+            str(a.get("name", ""))
+            for a in artists
+            if isinstance(a, dict)
         ),
     ]
+
     searchable = " ".join(text_parts).lower()
+
     blocked_terms = {
-        "karaoke",
-        "tribute",
-        "cover version",
-        "instrumental",
-        "piano version",
-        "lofi",
-        "lo-fi",
-        "sped up",
-        "slowed",
-        "nightcore",
-        "8d audio",
-        "podcast",
-        "episode",
-        "meditation",
-        "frequency",
-        "white noise",
-        "rain sounds",
-        "sleep sounds",
-        "tabata",
+        "karaoke", "tribute", "cover version", "instrumental",
+        "piano version", "lofi", "lo-fi", "sped up", "slowed",
+        "nightcore", "8d audio", "podcast", "episode",
+        "meditation", "frequency", "white noise",
+        "rain sounds", "sleep sounds", "tabata",
         "workout timer",
     }
-    return not any(term in searchable for term in blocked_terms)
+
+    if any(term in searchable for term in blocked_terms):
+        return False
+
+    popularity = item.get("popularity")
+    if isinstance(popularity, int) and popularity < 65:
+        return False
+
+    return True
 
 def _constrain_spotify_query(query: str) -> str:
     return query.strip()
