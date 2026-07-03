@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -22,6 +23,8 @@ class _AuraliaChatScreenState extends State<AuraliaChatScreen> {
   final TextEditingController _chatController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<_ChatMessage> _messages = [];
+  final Random _phraseRandom = Random();
+  final Map<String, int> _lastPhraseIndexes = {};
   AuraliaMood? _selectedMood;
   bool _isGenerating = false;
   bool _isTyping = false;
@@ -303,58 +306,47 @@ class _AuraliaChatScreenState extends State<AuraliaChatScreen> {
   }
 
   List<String> _responseSequenceFor(AuraliaMood mood) {
-    return switch (mood) {
-      AuraliaMood.sad => const [
-        'Oh, I am sorry you are feeling sad. Thank you for telling me.',
-        'I will not rush you into happy songs right away. I will start with music that understands the heaviness first.',
-        'Then I will gently guide the playlist toward something lighter, one step at a time.',
-      ],
-      AuraliaMood.stressed => const [
-        'That sounds like a lot to carry. Let us slow things down for a moment.',
-        'I will begin with tracks that reduce the pressure instead of adding more noise.',
-        'After that, I will move toward calmer focus so your mind has room to breathe.',
-      ],
-      AuraliaMood.neutral => const [
-        'Okay, I hear you. Neutral days can still need the right kind of support.',
-        'I will keep the playlist steady at first, so it does not push your mood too suddenly.',
-        'Then I will add a soft lift to help the rest of your day feel a little warmer.',
-      ],
-      AuraliaMood.happy => const [
-        'I love that you are feeling happy. Let us keep that good feeling with you.',
-        'I will choose songs that match your brightness without making the playlist feel too intense.',
-        'Then I will build toward a playful finish so the mood stays alive.',
-      ],
-      AuraliaMood.motivated => const [
-        'That is a strong place to start. I can feel the drive in that mood.',
-        'I will match your energy with songs that keep you moving without distracting you.',
-        'Then I will build momentum so the playlist supports focus and action.',
-      ],
-    };
+    return _phrasesFromPools(
+      mood: mood,
+      group: 'response',
+      pools: _responsePhrasePools[mood]!,
+    );
   }
 
   List<String> _generationMessagesFor(AuraliaMood mood) {
-    return switch (mood) {
-      AuraliaMood.sad => const [
-        'I am shaping the first songs to validate how you feel.',
-        'Now I am looking for a gentle transition toward comfort.',
-      ],
-      AuraliaMood.stressed => const [
-        'I am choosing a calmer starting point.',
-        'Now I am arranging the next tracks to release tension slowly.',
-      ],
-      AuraliaMood.neutral => const [
-        'I am keeping the opening balanced and easy.',
-        'Now I am adding a light lift without changing the mood too sharply.',
-      ],
-      AuraliaMood.happy => const [
-        'I am matching the playlist to your good mood.',
-        'Now I am arranging the final tracks to keep that brightness going.',
-      ],
-      AuraliaMood.motivated => const [
-        'I am matching your drive with steady energy.',
-        'Now I am building a focused progression for the next tracks.',
-      ],
-    };
+    return _phrasesFromPools(
+      mood: mood,
+      group: 'generation',
+      pools: _generationPhrasePools[mood]!,
+    );
+  }
+
+  List<String> _phrasesFromPools({
+    required AuraliaMood mood,
+    required String group,
+    required List<List<String>> pools,
+  }) {
+    return List.generate(
+      pools.length,
+      (index) => _pickPhrase(
+        key: '$group-${mood.name}-$index',
+        options: pools[index],
+      ),
+    );
+  }
+
+  String _pickPhrase({required String key, required List<String> options}) {
+    if (options.length == 1) {
+      return options.first;
+    }
+
+    var selectedIndex = _phraseRandom.nextInt(options.length);
+    final lastIndex = _lastPhraseIndexes[key];
+    if (lastIndex != null && selectedIndex == lastIndex) {
+      selectedIndex = (selectedIndex + 1) % options.length;
+    }
+    _lastPhraseIndexes[key] = selectedIndex;
+    return options[selectedIndex];
   }
 
   void _scrollToBottom() {
@@ -370,6 +362,157 @@ class _AuraliaChatScreenState extends State<AuraliaChatScreen> {
     });
   }
 }
+
+const Map<AuraliaMood, List<List<String>>> _responsePhrasePools = {
+  AuraliaMood.sad: [
+    [
+      'Oh, I am sorry you are feeling sad. Thank you for telling me.',
+      'I am sorry today feels sad. Thank you for sharing that with me.',
+      'I hear the sadness in that. Thank you for letting me know.',
+    ],
+    [
+      'I will not rush you into happy songs right away. I will start with music that understands the heaviness first.',
+      'I will not jump straight into bright songs. I will begin with music that meets the heaviness first.',
+      'I will start gently, with songs that make space for the sadness before asking it to shift.',
+    ],
+    [
+      'Then I will gently guide the playlist toward something lighter, one step at a time.',
+      'Then I will move the playlist slowly toward a softer, lighter feeling step by step.',
+      'After that, I will guide the sound toward comfort and a little more light.',
+    ],
+  ],
+  AuraliaMood.stressed: [
+    [
+      'That sounds like a lot to carry. Let us slow things down for a moment.',
+      'That sounds heavy on your mind. Let us give everything a little more space.',
+      'I hear the pressure there. Let us slow the pace for a moment.',
+    ],
+    [
+      'I will begin with tracks that reduce the pressure instead of adding more noise.',
+      'I will start with songs that soften the pressure rather than adding more stimulation.',
+      'I will choose an opening that eases the tension instead of crowding your thoughts.',
+    ],
+    [
+      'After that, I will move toward calmer focus so your mind has room to breathe.',
+      'Then I will guide the playlist toward steadier focus, so your mind can breathe.',
+      'After the first tracks, I will shift toward calm energy and clearer focus.',
+    ],
+  ],
+  AuraliaMood.neutral: [
+    [
+      'Okay, I hear you. Neutral days can still need the right kind of support.',
+      'Okay, I understand. Even a neutral mood can use the right kind of soundtrack.',
+      'Got it. A steady day still deserves music that supports where you are.',
+    ],
+    [
+      'I will keep the playlist steady at first, so it does not push your mood too suddenly.',
+      'I will begin with a steady sound, so the playlist does not shift your mood too sharply.',
+      'I will keep the opening balanced and easy, matching your mood without forcing it.',
+    ],
+    [
+      'Then I will add a soft lift to help the rest of your day feel a little warmer.',
+      'Then I will bring in a gentle lift to add a little warmth to the day.',
+      'After that, I will let the playlist rise softly toward a warmer feeling.',
+    ],
+  ],
+  AuraliaMood.happy: [
+    [
+      'I love that you are feeling happy. Let us keep that good feeling with you.',
+      'I am glad you are feeling happy. Let us help that feeling stay with you.',
+      'That is lovely to hear. I will help keep that brightness around you.',
+    ],
+    [
+      'I will choose songs that match your brightness without making the playlist feel too intense.',
+      'I will start with songs that match the brightness without pushing it too hard.',
+      'I will keep the energy warm and bright, without making it feel overwhelming.',
+    ],
+    [
+      'Then I will build toward a playful finish so the mood stays alive.',
+      'Then I will build the playlist toward a playful finish that keeps the mood glowing.',
+      'After that, I will lift the ending so the good feeling keeps moving with you.',
+    ],
+  ],
+  AuraliaMood.motivated: [
+    [
+      'That is a strong place to start. I can feel the drive in that mood.',
+      'That is a focused place to begin. I can feel the energy in that mood.',
+      'I hear the drive in that. Let us turn it into steady momentum.',
+    ],
+    [
+      'I will match your energy with songs that keep you moving without distracting you.',
+      'I will choose songs that match your drive while keeping the focus clear.',
+      'I will start with tracks that support your energy without pulling attention away.',
+    ],
+    [
+      'Then I will build momentum so the playlist supports focus and action.',
+      'Then I will build the sequence toward momentum, focus, and action.',
+      'After that, I will keep the progression moving so your focus can stay strong.',
+    ],
+  ],
+};
+
+const Map<AuraliaMood, List<List<String>>> _generationPhrasePools = {
+  AuraliaMood.sad: [
+    [
+      'I am shaping the first songs to validate how you feel.',
+      'I am choosing the opening songs to gently validate this feeling.',
+      'I am setting the first tracks to meet your sadness with care.',
+    ],
+    [
+      'Now I am looking for a gentle transition toward comfort.',
+      'Now I am finding a soft transition toward comfort.',
+      'Now I am guiding the middle tracks toward something more comforting.',
+    ],
+  ],
+  AuraliaMood.stressed: [
+    [
+      'I am choosing a calmer starting point.',
+      'I am setting up a calmer opening for the playlist.',
+      'I am finding tracks that start with less pressure.',
+    ],
+    [
+      'Now I am arranging the next tracks to release tension slowly.',
+      'Now I am shaping the next songs to let tension loosen slowly.',
+      'Now I am building a slow release from pressure into steadier focus.',
+    ],
+  ],
+  AuraliaMood.neutral: [
+    [
+      'I am keeping the opening balanced and easy.',
+      'I am setting the first songs to feel steady and easy.',
+      'I am choosing a balanced opening that meets you where you are.',
+    ],
+    [
+      'Now I am adding a light lift without changing the mood too sharply.',
+      'Now I am adding a gentle lift without pushing the mood too fast.',
+      'Now I am guiding the playlist upward in a soft, natural way.',
+    ],
+  ],
+  AuraliaMood.happy: [
+    [
+      'I am matching the playlist to your good mood.',
+      'I am choosing songs that match your bright mood.',
+      'I am shaping the opening around the happiness you are feeling.',
+    ],
+    [
+      'Now I am arranging the final tracks to keep that brightness going.',
+      'Now I am building the ending so the brightness can continue.',
+      'Now I am setting the final songs to keep the good feeling alive.',
+    ],
+  ],
+  AuraliaMood.motivated: [
+    [
+      'I am matching your drive with steady energy.',
+      'I am choosing tracks that match your drive with steady energy.',
+      'I am setting the opening to support your motivation and focus.',
+    ],
+    [
+      'Now I am building a focused progression for the next tracks.',
+      'Now I am arranging the next tracks into a focused progression.',
+      'Now I am building momentum so the playlist keeps you moving.',
+    ],
+  ],
+};
 
 class _ChatHeader extends StatelessWidget {
   const _ChatHeader({required this.onBack});
