@@ -28,7 +28,7 @@ _spotify_search_cache_ttl = 60 * 60 * 6
 _spotify_rate_limit_cache_ttl = 60
 _spotify_image_cache: dict[str, str] = {}
 _spotify_search_limit = 50
-_min_release_year = 2024
+_min_release_year = 2025
 _max_release_year = 2026
 
 
