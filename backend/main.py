@@ -25,6 +25,7 @@ _spotify_access_token: str | None = None
 _spotify_token_expires_at = 0.0
 _spotify_search_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 _spotify_search_cache_ttl = 60 * 60 * 6
+_spotify_rate_limit_cache_ttl = 60
 _spotify_image_cache: dict[str, str] = {}
 _spotify_search_limit = 50
 _min_release_year = 2021
@@ -109,9 +110,14 @@ async def spotify_search(
     data["auralia_source"] = data.get("auralia_source", "spotify_api")
     print(f"AURALIA Spotify search source={data['auralia_source']} query={q}")
 
-    if (
+    if data.get("auralia_error") == "rate_limited":
+        _spotify_search_cache[cache_key] = (
+            now + _spotify_rate_limit_cache_ttl,
+            data,
+        )
+    elif (
         data.get("auralia_source") == "spotify_api"
-        and data.get("auralia_error") not in {"rate_limited", "no_usable_spotify_tracks"}
+        and data.get("auralia_error") != "no_usable_spotify_tracks"
     ):
         _spotify_search_cache[cache_key] = (now + _spotify_search_cache_ttl, data)
     return data
@@ -175,139 +181,144 @@ async def _spotify_track_search(
     clean_query = _simplify_search_query(query)
     constrained_query = _constrain_spotify_query(query)
     constrained_clean_query = _constrain_spotify_query(clean_query)
-    if allow_fallback:
-        search_queries = [
-            constrained_query,
-            constrained_clean_query,
-            _constrain_spotify_query(f"{clean_query} pop"),
-            _constrain_spotify_query(f"{clean_query} hits"),
-            _constrain_spotify_query(f"{clean_query} songs"),
-        ]
-        offsets = (
-            0,
-            _spotify_search_limit,
-            _spotify_search_limit * 2,
-            _spotify_search_limit * 3,
+    search_queries = list(
+        dict.fromkeys(
+            query
+            for query in (constrained_query, constrained_clean_query)
+            if query.strip()
         )
-    else:
-        search_queries = [
-            constrained_query,
-            constrained_clean_query,
-        ]
-        offsets = (0,)
+    )[:2]
+    offsets = (0, _spotify_search_limit)[:2]
 
-    all_items: list[dict[str, Any]] = []
     first_response_body: dict[str, Any] | None = None
 
     async with httpx.AsyncClient(timeout=15) as client:
-        for search_query in dict.fromkeys(search_queries):
-            if not search_query.strip():
-                continue
+        for search_query in search_queries:
+            response_body = await _spotify_search_with_params(
+                client=client,
+                token=token,
+                original_query=query,
+                search_query=search_query,
+                offsets=offsets,
+                market="MY",
+                allow_fallback=allow_fallback,
+            )
+            if response_body.get("auralia_error") == "rate_limited":
+                return response_body
+            if first_response_body is None and response_body:
+                first_response_body = response_body
 
-            for params in (
-                {
-                    "q": search_query,
-                    "type": "track",
-                    "market": "MY",
-                    "limit": _spotify_search_limit,
-                },
-                {
-                    "q": search_query,
-                    "type": "track",
-                    "limit": _spotify_search_limit,
-                },
-            ):
-                combined_items: list[dict[str, Any]] = []
-                response_body: dict[str, Any] | None = None
+            items = response_body.get("tracks", {}).get("items", [])
+            if items:
+                return response_body
 
-                for offset in offsets:
-                    response = await client.get(
-                        "https://api.spotify.com/v1/search",
-                        params={**params, "offset": offset},
-                        headers={"Authorization": f"Bearer {token}"},
-                    )
+            no_market_response = await _spotify_search_with_params(
+                client=client,
+                token=token,
+                original_query=query,
+                search_query=search_query,
+                offsets=(0,),
+                market=None,
+                allow_fallback=allow_fallback,
+            )
+            if no_market_response.get("auralia_error") == "rate_limited":
+                return no_market_response
+            if first_response_body is None and no_market_response:
+                first_response_body = no_market_response
 
-                    if response.status_code >= 400:
-                        if (
-                            response.status_code == 400
-                            and "Invalid limit" in response.text
-                            and ("limit" in params or offset)
-                        ):
-                            retry_params = {
-                                key: value
-                                for key, value in params.items()
-                                if key != "limit"
-                            }
-                            response = await client.get(
-                                "https://api.spotify.com/v1/search",
-                                params=retry_params,
-                                headers={"Authorization": f"Bearer {token}"},
-                            )
-                            if response.status_code < 400:
-                                response_body = response.json()
-                                if first_response_body is None:
-                                    first_response_body = response_body
-                                items = response_body.get("tracks", {}).get(
-                                    "items",
-                                    [],
-                                )
-                                print(
-                                    "AURALIA Spotify search ok "
-                                    f"query={search_query} retry=default-limit "
-                                    f"items={len(items)}"
-                                )
-                                combined_items.extend(
-                                    item for item in items if isinstance(item, dict)
-                                )
-                                break
-
-                        print(
-                            "AURALIA Spotify search failed "
-                            f"status={response.status_code} query={search_query} "
-                            f"body={response.text[:160]}"
-                        )
-                        if response.status_code == 429:
-                            retry_after = response.headers.get("Retry-After")
-                            if not allow_fallback:
-                                return await _spotify_empty_search(
-                                    query,
-                                    "rate_limited",
-                                    retry_after=retry_after,
-                                )
-                            return await _fallback_spotify_search(query)
-                        if offset == 0:
-                            combined_items = []
-                            response_body = None
-                        break
-
-                    response_body = response.json()
-                    if first_response_body is None:
-                        first_response_body = response_body
-                    items = response_body.get("tracks", {}).get("items", [])
-                    print(
-                        "AURALIA Spotify search ok "
-                        f"query={search_query} offset={offset} "
-                        f"items={len(items)}"
-                    )
-                    combined_items.extend(
-                        item for item in items if isinstance(item, dict)
-                    )
-                    if len(items) < _spotify_search_limit:
-                        break
-
-                if response_body is not None and combined_items:
-                    all_items.extend(combined_items)
-
-    if first_response_body is not None and all_items:
-        first_response_body.setdefault("tracks", {})["items"] = all_items
-        first_response_body["tracks"]["limit"] = len(all_items)
-        first_response_body["tracks"]["total"] = len(all_items)
-        return first_response_body
+            items = no_market_response.get("tracks", {}).get("items", [])
+            if items:
+                return no_market_response
 
     if not allow_fallback:
         return await _spotify_empty_search(query, "no_usable_spotify_tracks")
 
     return await _fallback_spotify_search(query)
+
+
+async def _spotify_search_with_params(
+    *,
+    client: httpx.AsyncClient,
+    token: str,
+    original_query: str,
+    search_query: str,
+    offsets: tuple[int, ...],
+    market: str | None,
+    allow_fallback: bool,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {
+        "q": search_query,
+        "type": "track",
+        "limit": _spotify_search_limit,
+    }
+    if market:
+        params["market"] = market
+
+    for offset in offsets:
+        response = await client.get(
+            "https://api.spotify.com/v1/search",
+            params={**params, "offset": offset},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        if response.status_code >= 400:
+            if (
+                response.status_code == 400
+                and "Invalid limit" in response.text
+                and "limit" in params
+            ):
+                retry_params = {
+                    key: value
+                    for key, value in params.items()
+                    if key != "limit"
+                }
+                response = await client.get(
+                    "https://api.spotify.com/v1/search",
+                    params=retry_params,
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                if response.status_code < 400:
+                    body = response.json()
+                    items = body.get("tracks", {}).get("items", [])
+                    print(
+                        "AURALIA Spotify search ok "
+                        f"query={search_query} retry=default-limit "
+                        f"market={market or 'none'} items={len(items)}"
+                    )
+                    if items:
+                        return body
+
+            print(
+                "AURALIA Spotify search failed "
+                f"status={response.status_code} query={search_query} "
+                f"market={market or 'none'} body={response.text[:160]}"
+            )
+            if response.status_code == 429:
+                retry_after = response.headers.get("Retry-After")
+                if not allow_fallback:
+                    return await _spotify_empty_search(
+                        original_query,
+                        "rate_limited",
+                        retry_after=retry_after,
+                    )
+                fallback = await _fallback_spotify_search(original_query)
+                fallback["auralia_error"] = "rate_limited"
+                if retry_after:
+                    fallback["retry_after_seconds"] = retry_after
+                return fallback
+            return {}
+
+        body = response.json()
+        items = body.get("tracks", {}).get("items", [])
+        print(
+            "AURALIA Spotify search ok "
+            f"query={search_query} offset={offset} "
+            f"market={market or 'none'} items={len(items)}"
+        )
+        if items:
+            return body
+
+    return {}
 
 
 async def _spotify_empty_search(
