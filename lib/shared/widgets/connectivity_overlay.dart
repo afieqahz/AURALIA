@@ -100,20 +100,21 @@ class _ConnectivityOverlayState extends State<ConnectivityOverlay>
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        if (widget.child != null) widget.child!,
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: _isOffline
-              ? _OfflineBarrier(
-                  key: const ValueKey('offline-barrier'),
-                  isRetrying: _isRetrying,
-                  onRetry: _retry,
-                )
-              : const SizedBox.shrink(key: ValueKey('online')),
-        ),
-      ],
+    return PopScope(
+      // Blocks the Android back button while the barrier is up, so the
+      // user can't navigate away from underneath it.
+      canPop: !_isOffline,
+      child: Stack(
+        children: [
+          if (widget.child != null) widget.child!,
+          if (_isOffline)
+            _OfflineBarrier(
+              key: const ValueKey('offline-barrier'),
+              isRetrying: _isRetrying,
+              onRetry: _retry,
+            ),
+        ],
+      ),
     );
   }
 }
@@ -130,35 +131,33 @@ class _OfflineBarrier extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      // Blocks the Android back button while the barrier is up, so the
-      // user can't navigate away from underneath it.
-      canPop: false,
-      child: Positioned.fill(
-        child: Stack(
-          children: [
-            // Blurs and dims whatever page is currently underneath.
-            Positioned.fill(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(color: Colors.black.withValues(alpha: 0.45)),
+    // This Positioned.fill is a direct child of the Stack built above,
+    // which is required — Positioned only works as an immediate Stack
+    // child, which is what caused the card not to show before.
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          // Blurs and dims whatever page is currently underneath.
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(color: Colors.black.withValues(alpha: 0.45)),
+            ),
+          ),
+          // Swallows every tap/scroll so nothing underneath is reachable.
+          const Positioned.fill(
+            child: AbsorbPointer(child: SizedBox.expand()),
+          ),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: ConnectionErrorCard(
+                isRetrying: isRetrying,
+                onRetry: onRetry,
               ),
             ),
-            // Swallows every tap/scroll so nothing underneath is reachable.
-            const Positioned.fill(
-              child: AbsorbPointer(child: SizedBox.expand()),
-            ),
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: ConnectionErrorCard(
-                  isRetrying: isRetrying,
-                  onRetry: onRetry,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
