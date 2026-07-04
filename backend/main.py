@@ -88,9 +88,10 @@ async def _spotify_token() -> dict[str, Any]:
 async def spotify_search(
     q: str = Query(..., min_length=1),
     allow_fallback: bool = Query(True),
-     mood: str = Query("neutral")
+    mood: str = Query("neutral")
 ) -> dict[str, Any]:
-    cache_key = f"{q.strip().lower()}|fallback={allow_fallback}"
+    mood = mood.strip().lower()
+    cache_key = f"{q.strip().lower()}|fallback={allow_fallback}|mood={mood}"
     cached = _spotify_search_cache.get(cache_key)
     now = time.time()
     if cached and cached[0] > now:
@@ -702,6 +703,10 @@ def _mood_boost(track: dict[str, Any], mood: str) -> float:
         keywords = ["love", "cry", "alone", "heart", "pain", "stay", "goodbye"]
         return 3.0 if any(k in text for k in keywords) else 1.0
 
+    if mood == "stressed":
+        keywords = ["calm", "breathe", "soft", "peace", "easy", "slow", "focus"]
+        return 3.0 if any(k in text for k in keywords) else 1.0
+
     if mood == "motivated":
         keywords = ["fire", "run", "win", "power", "strong", "rise", "fight"]
         return 3.0 if any(k in text for k in keywords) else 1.0
@@ -764,8 +769,10 @@ def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]
         except Exception:
             year = 2023
 
-        # slightly more stable weighting
-        return popularity * 10 + max(0, (year - 2018) * 2)
+        recent_bonus = max(0, (year - 2020) * 4)
+        very_popular_bonus = 80 if popularity >= 80 else 0
+        known_bonus = 30 if popularity >= 70 else 0
+        return popularity * 12 + recent_bonus + very_popular_bonus + known_bonus
 
     return sorted(playable, key=score, reverse=True)
 
@@ -786,26 +793,11 @@ def _build_iso_playlist(tracks, mood="neutral"):
     if not tracks:
         return {"validation": [], "transition": [], "elevation": []}
 
-    validation = []
-    transition = []
-    elevation = []
-
-    for i, track in enumerate(tracks):
-        if mood == "sad":
-            if i % 3 == 0:
-                validation.append(track)
-            elif i % 3 == 1:
-                transition.append(track)
-            else:
-                elevation.append(track)
-        else:
-            # fallback balanced distribution
-            if i < len(tracks) * 0.33:
-                validation.append(track)
-            elif i < len(tracks) * 0.66:
-                transition.append(track)
-            else:
-                elevation.append(track)
+    first_cut = max(1, len(tracks) // 3)
+    second_cut = max(first_cut + 1, (len(tracks) * 2) // 3)
+    validation = tracks[:first_cut]
+    transition = tracks[first_cut:second_cut]
+    elevation = tracks[second_cut:]
 
     return {
         "validation": validation,

@@ -623,6 +623,7 @@ class SpotifyPlaylistService implements PlaylistService {
       plan.map(
         (stage) => _searchTracks(
           query: stage.query,
+          mood: mood,
           stage: stage.stage,
           valence: stage.valence,
           energy: stage.energy,
@@ -930,6 +931,7 @@ class SpotifyPlaylistService implements PlaylistService {
         final stage = plan[i];
         return _searchTrack(
           query: stage.query,
+          mood: mood,
           stage: stage.stage,
           valence: stage.valence,
           energy: stage.energy,
@@ -959,6 +961,7 @@ class SpotifyPlaylistService implements PlaylistService {
 
   Future<AuraliaTrack?> _searchTrack({
     required String query,
+    required AuraliaMood mood,
     required String stage,
     required double valence,
     required double energy,
@@ -967,6 +970,7 @@ class SpotifyPlaylistService implements PlaylistService {
   }) async {
     final tracks = await _searchTracks(
       query: query,
+      mood: mood,
       stage: stage,
       valence: valence,
       energy: energy,
@@ -982,6 +986,7 @@ class SpotifyPlaylistService implements PlaylistService {
 
   Future<List<AuraliaTrack>> _searchTracks({
     required String query,
+    required AuraliaMood mood,
     required String stage,
     required double valence,
     required double energy,
@@ -992,7 +997,7 @@ class SpotifyPlaylistService implements PlaylistService {
     try {
       response = AppConfig.spotifyBackendUrl.isNotEmpty
           ? await _client
-                .get(_backendSearchUri(query))
+                .get(_backendSearchUri(query, mood))
                 .timeout(const Duration(seconds: 6))
           : await _client
                 .get(
@@ -1050,7 +1055,7 @@ class SpotifyPlaylistService implements PlaylistService {
     return year != null && year >= 2021 && year <= 2026;
   }
 
-  Uri _backendSearchUri(String query) {
+  Uri _backendSearchUri(String query, AuraliaMood mood) {
     final baseUri = Uri.parse(AppConfig.spotifyBackendUrl);
     final searchPath = [
       baseUri.path.replaceAll(RegExp(r'/+$'), ''),
@@ -1062,6 +1067,7 @@ class SpotifyPlaylistService implements PlaylistService {
       path: '/$searchPath',
       queryParameters: {
         'q': query,
+        'mood': mood.name,
         'allow_fallback': AppConfig.spotifyOnly ? 'false' : 'true',
       },
     );
