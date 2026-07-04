@@ -25,12 +25,12 @@ class ConnectionErrorCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
+        color: const Color(0xFF6E3572),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+        border: Border.all(color: const Color(0xFF8A4D92)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
+            color: Colors.black.withValues(alpha: 0.18),
             blurRadius: 22,
             offset: const Offset(0, 12),
           ),
