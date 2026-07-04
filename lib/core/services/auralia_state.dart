@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +11,7 @@ import '../models/mood.dart';
 import '../models/playlist.dart';
 import 'auralia_recommendation_service.dart';
 import 'auth_service.dart';
+import 'connectivity_bus.dart';
 import 'mood_repository.dart';
 import 'playlist_repository.dart';
 import 'playlist_service.dart';
@@ -66,6 +68,7 @@ class AuraliaState extends ChangeNotifier {
   bool _playbackStartedByUser = false;
   String? _lastShownWellnessEntryKey;
   String? _errorMessage;
+  bool _lastErrorWasConnectivity = false;
 
   static const _playbackPlaylistKey = 'auralia.playback.playlist';
   static const _playbackTrackIndexKey = 'auralia.playback.track_index';
@@ -78,6 +81,7 @@ class AuraliaState extends ChangeNotifier {
   bool get isAuthenticated => currentUser != null;
   bool get isBusy => _isBusy;
   String? get errorMessage => _errorMessage;
+  bool get lastErrorWasConnectivity => _lastErrorWasConnectivity;
   List<MoodEntry> get moodHistory => List.unmodifiable(_moodHistory);
   int get moodEntryCount => _moodHistory
       .where((entry) => entry.checkInType == MoodCheckInType.beforeListening)
@@ -983,18 +987,42 @@ class AuraliaState extends ChangeNotifier {
   Future<bool> _runBusyTask(Future<void> Function() task) async {
     _isBusy = true;
     _errorMessage = null;
+    _lastErrorWasConnectivity = false;
     notifyListeners();
 
     try {
       await task();
       return true;
     } catch (error) {
-      _errorMessage = error.toString();
+      final isConnectivityError = _isConnectivityError(error);
+      _lastErrorWasConnectivity = isConnectivityError;
+      if (isConnectivityError) {
+        // Don't surface a raw SocketException/ClientException string —
+        // the global connectivity overlay already tells the user what's
+        // wrong. Just nudge it to check right away instead of waiting for
+        // its next poll.
+        _errorMessage = null;
+        ConnectivityBus.instance.notifyPossibleDisconnect();
+      } else {
+        _errorMessage = error.toString();
+      }
       return false;
     } finally {
       _isBusy = false;
       notifyListeners();
     }
+  }
+
+  bool _isConnectivityError(Object error) {
+    if (error is SocketException) {
+      return true;
+    }
+    final text = error.toString();
+    return text.contains('SocketException') ||
+        text.contains('Failed host lookup') ||
+        text.contains('Connection failed') ||
+        text.contains('Network is unreachable') ||
+        text.contains('Connection reset by peer');
   }
 
   Future<void> _cacheMoodEntry(String userId, MoodEntry entry) async {
