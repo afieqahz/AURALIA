@@ -151,22 +151,34 @@ class _OfflineBarrier extends StatelessWidget {
       child: Stack(
         children: [
           // Blurs and dims whatever page is currently underneath.
+          //
+          // Wrapped in its own RepaintBoundary so the BackdropFilter's
+          // saveLayer stays isolated to this layer instead of bleeding into
+          // the card's text below — on some GPUs, text sharing a
+          // compositing pass with an active BackdropFilter blur renders
+          // with a stray colored fringe under the glyphs.
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(color: Colors.black.withValues(alpha: 0.45)),
+            child: RepaintBoundary(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.45),
+                ),
+              ),
             ),
           ),
           // Swallows every tap/scroll so nothing underneath is reachable.
           const Positioned.fill(
             child: AbsorbPointer(child: SizedBox.expand()),
           ),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: ConnectionErrorCard(
-                isRetrying: isRetrying,
-                onRetry: onRetry,
+          RepaintBoundary(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: ConnectionErrorCard(
+                  isRetrying: isRetrying,
+                  onRetry: onRetry,
+                ),
               ),
             ),
           ),
