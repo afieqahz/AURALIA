@@ -8,6 +8,7 @@ import 'package:auralia_app/core/models/mood.dart';
 import 'package:auralia_app/core/models/playlist.dart';
 import 'package:auralia_app/core/services/auralia_scope.dart';
 import 'package:auralia_app/core/services/auralia_state.dart';
+import 'package:auralia_app/core/services/connectivity_bus.dart';
 import 'package:auralia_app/core/widgets/floating_bubbles.dart';
 
 class AuraliaChatScreen extends StatefulWidget {
@@ -29,6 +30,7 @@ class _AuraliaChatScreenState extends State<AuraliaChatScreen> {
   bool _isGenerating = false;
   bool _isTyping = false;
   bool _showPlaylists = false;
+  AuraliaMood? _pendingRetryMood;
 
   @override
   void initState() {
@@ -40,13 +42,24 @@ class _AuraliaChatScreenState extends State<AuraliaChatScreen> {
         isUser: false,
       ),
     );
+    ConnectivityBus.instance.reconnected.addListener(_onReconnected);
   }
 
   @override
   void dispose() {
+    ConnectivityBus.instance.reconnected.removeListener(_onReconnected);
     _chatController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onReconnected() {
+    final mood = _pendingRetryMood;
+    if (mood == null || !mounted) {
+      return;
+    }
+    _pendingRetryMood = null;
+    _generatePlaylistForMood(mood, showGenerationMessages: false);
   }
 
   Future<void> _recordMood(
@@ -80,15 +93,46 @@ class _AuraliaChatScreenState extends State<AuraliaChatScreen> {
 
     setState(() {
       _isTyping = false;
-      _isGenerating = true;
     });
+    _scrollToBottom();
+
+    await _generatePlaylistForMood(mood, showGenerationMessages: true);
+  }
+
+  /// Runs the actual playlist generation call and reacts to the result.
+  ///
+  /// Used both for the normal first attempt (with the "shaping your
+  /// playlist..." messages) and for a silent retry after the connection
+  /// drops mid-generation and then comes back — in that case we skip the
+  /// chatty messages and just pick up where things left off.
+  Future<void> _generatePlaylistForMood(
+    AuraliaMood mood, {
+    required bool showGenerationMessages,
+  }) async {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _isGenerating = true);
     _scrollToBottom();
 
     final state = AuraliaScope.of(context);
     final generation = state.recordMood(mood);
-    await _showAssistantMessages(_generationMessagesFor(mood));
+    if (showGenerationMessages) {
+      await _showAssistantMessages(_generationMessagesFor(mood));
+    }
     final success = await generation;
     if (!mounted) {
+      return;
+    }
+
+    if (!success && state.lastErrorWasConnectivity) {
+      // Don't dump a raw connection error into the chat — the global
+      // offline overlay is already covering the screen and telling the
+      // user what's wrong. Leave the "generating" state as-is and just
+      // remember what we were doing, so this picks back up automatically
+      // and invisibly the instant the connection returns.
+      _pendingRetryMood = mood;
       return;
     }
 
@@ -104,7 +148,8 @@ class _AuraliaChatScreenState extends State<AuraliaChatScreen> {
         _showPlaylists = false;
         _messages.add(
           _ChatMessage(
-            text: state.errorMessage ?? 'I could not generate playlists right now.',
+            text:
+                state.errorMessage ?? 'I could not generate playlists right now.',
             isUser: false,
             isError: true,
           ),
