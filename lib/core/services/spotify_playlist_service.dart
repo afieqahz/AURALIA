@@ -775,11 +775,11 @@ class SpotifyPlaylistService implements PlaylistService {
   }
 
   String _trackKey(AuraliaTrack track) {
-    final id = track.id;
-    if (id != null && id.isNotEmpty) {
-      return id;
-    }
-    return '${track.title.toLowerCase()}-${track.artist.toLowerCase()}';
+    return '${_normalizeTrackText(track.title)}-${_normalizeTrackText(track.artist)}';
+  }
+
+  String _normalizeTrackText(String text) {
+    return text.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
   }
 
   List<AuraliaTrack> _filterTracksForMoodStage({
@@ -797,7 +797,7 @@ class SpotifyPlaylistService implements PlaylistService {
     }
 
     final validationTracks = nonHype.where(_looksLikeValidationTrack).toList();
-    if (validationTracks.isNotEmpty) {
+    if (validationTracks.length >= 6) {
       return validationTracks;
     }
     return nonHype.isEmpty ? tracks : nonHype;
