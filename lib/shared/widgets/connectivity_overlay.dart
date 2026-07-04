@@ -150,21 +150,14 @@ class _OfflineBarrier extends StatelessWidget {
     return Positioned.fill(
       child: Stack(
         children: [
-          // Blurs and dims whatever page is currently underneath.
-          //
-          // Wrapped in its own RepaintBoundary so the BackdropFilter's
-          // saveLayer stays isolated to this layer instead of bleeding into
-          // the card's text below — on some GPUs, text sharing a
-          // compositing pass with an active BackdropFilter blur renders
-          // with a stray colored fringe under the glyphs.
-          Positioned.fill(
-            child: RepaintBoundary(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.45),
-                ),
-              ),
+          // TEMPORARY DIAGNOSTIC: dim only, no blur. If the yellow fringe
+          // under the card's text is gone with this change, it confirms
+          // BackdropFilter itself is the trigger and we should redesign
+          // around a live blur here. If it's still there, blur was never
+          // the cause and we look elsewhere.
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: ColoredBox(color: Color(0x73000000)),
             ),
           ),
           // Swallows every tap/scroll so nothing underneath is reachable.
