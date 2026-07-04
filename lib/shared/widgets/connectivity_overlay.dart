@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:auralia_app/core/services/app_ready_notifier.dart';
+import 'package:auralia_app/core/services/connectivity_bus.dart';
 import 'package:auralia_app/core/services/connectivity_watcher.dart';
 import 'package:auralia_app/shared/widgets/connection_error_card.dart';
 
@@ -38,6 +39,7 @@ class _ConnectivityOverlayState extends State<ConnectivityOverlay>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     AppReadyNotifier.instance.addListener(_onAppReadyChanged);
+    ConnectivityBus.instance.possibleDisconnect.addListener(_checkConnection);
     if (AppReadyNotifier.instance.value) {
       _startPolling();
     }
@@ -67,7 +69,11 @@ class _ConnectivityOverlayState extends State<ConnectivityOverlay>
     if (shouldBeOffline == _isOffline) {
       return;
     }
+    final wasOffline = _isOffline;
     setState(() => _isOffline = shouldBeOffline);
+    if (wasOffline && !shouldBeOffline) {
+      ConnectivityBus.instance.notifyReconnected();
+    }
   }
 
   Future<void> _retry() async {
@@ -75,10 +81,14 @@ class _ConnectivityOverlayState extends State<ConnectivityOverlay>
     setState(() => _isRetrying = true);
     final hasInternet = await ConnectivityWatcher.hasInternetConnection();
     if (!mounted) return;
+    final wasOffline = _isOffline;
     setState(() {
       _isRetrying = false;
       _isOffline = !hasInternet;
     });
+    if (wasOffline && hasInternet) {
+      ConnectivityBus.instance.notifyReconnected();
+    }
   }
 
   @override
@@ -95,6 +105,9 @@ class _ConnectivityOverlayState extends State<ConnectivityOverlay>
     _pollTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     AppReadyNotifier.instance.removeListener(_onAppReadyChanged);
+    ConnectivityBus.instance.possibleDisconnect.removeListener(
+      _checkConnection,
+    );
     super.dispose();
   }
 
