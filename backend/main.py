@@ -780,7 +780,7 @@ def _dedupe_tracks(tracks):
 
     return result
 
-def _build_iso_playlist(tracks, mood: str):
+def _build_iso_playlist(tracks, mood: str = "neutral"):
     if not tracks:
         return {"validation": [], "transition": [], "elevation": []}
 
