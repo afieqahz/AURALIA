@@ -106,20 +106,22 @@ async def spotify_search(
     items = data.get("tracks", {}).get("items", [])
 
     ranked_items = _rank_mainstream_tracks(items)
+    ranked_items = _dedupe_tracks(ranked_items)
+
     ranked_items = sorted(
     ranked_items,
     key=lambda t: _mood_boost(t, mood),
     reverse=True
-)
+    )
 
-    ranked_items = _dedupe_tracks(ranked_items)
+    iso_playlist = _build_iso_playlist(ranked_items, mood)
    
     data["tracks"] = {
-        "href": data.get("tracks", {}).get("href", ""),
-        "limit": 30,
-        "total": len(ranked_items),
-        "items": ranked_items[:30],
-        "iso_sequence": iso_playlist
+    "href": data.get("tracks", {}).get("href", ""),
+    "limit": 30,
+    "total": len(ranked_items),
+    "items": ranked_items[:30],
+    "iso_sequence": iso_playlist,
     }
     
     if data.get("auralia_error") == "rate_limited":
@@ -780,30 +782,35 @@ def _dedupe_tracks(tracks):
 
     return result
 
-def _build_iso_playlist(tracks, mood: str = "neutral"):
+def _build_iso_playlist(tracks, mood="neutral"):
     if not tracks:
         return {"validation": [], "transition": [], "elevation": []}
 
-    if mood in ["sad", "stressed"]:
-        v, t, e = 0.5, 0.3, 0.2
-    elif mood == "neutral":
-        v, t, e = 0.33, 0.33, 0.34
-    elif mood == "happy":
-        v, t, e = 0.2, 0.4, 0.4
-    elif mood == "motivated":
-        v, t, e = 0.1, 0.2, 0.7
-    else:
-        v, t, e = 0.33, 0.33, 0.34
+    validation = []
+    transition = []
+    elevation = []
 
-    n = len(tracks)
-
-    v_end = int(n * v)
-    t_end = int(n * (v + t))
+    for i, track in enumerate(tracks):
+        if mood == "sad":
+            if i % 3 == 0:
+                validation.append(track)
+            elif i % 3 == 1:
+                transition.append(track)
+            else:
+                elevation.append(track)
+        else:
+            # fallback balanced distribution
+            if i < len(tracks) * 0.33:
+                validation.append(track)
+            elif i < len(tracks) * 0.66:
+                transition.append(track)
+            else:
+                elevation.append(track)
 
     return {
-        "validation": tracks[:v_end],
-        "transition": tracks[v_end:t_end],
-        "elevation": tracks[t_end:]
+        "validation": validation,
+        "transition": transition,
+        "elevation": elevation
     }
 
 def _release_year_is_allowed(item: dict[str, Any]) -> bool:
