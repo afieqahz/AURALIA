@@ -60,6 +60,7 @@ class ConnectionErrorCard extends StatelessWidget {
               fontSize: 17,
               fontWeight: FontWeight.w800,
               color: Colors.white,
+              decoration: TextDecoration.none,
             ),
           ),
           const SizedBox(height: 6),
@@ -70,6 +71,7 @@ class ConnectionErrorCard extends StatelessWidget {
               fontSize: 12,
               height: 1.45,
               color: Colors.white.withValues(alpha: 0.76),
+              decoration: TextDecoration.none,
             ),
           ),
           const SizedBox(height: 16),
@@ -98,7 +100,10 @@ class ConnectionErrorCard extends StatelessWidget {
                   : const Icon(Icons.refresh_rounded),
               label: Text(
                 isRetrying ? 'Checking...' : 'Try again',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w800),
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w800,
+                  decoration: TextDecoration.none,
+                ),
               ),
             ),
           ),

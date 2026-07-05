@@ -1004,7 +1004,7 @@ class AuraliaState extends ChangeNotifier {
         _errorMessage = null;
         ConnectivityBus.instance.notifyPossibleDisconnect();
       } else {
-        _errorMessage = error.toString();
+        _errorMessage = _friendlyErrorMessage(error);
       }
       return false;
     } finally {
@@ -1023,6 +1023,46 @@ class AuraliaState extends ChangeNotifier {
         text.contains('Connection failed') ||
         text.contains('Network is unreachable') ||
         text.contains('Connection reset by peer');
+  }
+
+  String _friendlyErrorMessage(Object error) {
+    final raw = error.toString().trim();
+    final message = raw
+        .replaceFirst(RegExp(r'^Exception:\s*'), '')
+        .replaceFirst(RegExp(r'^AuthFlowException:\s*'), '')
+        .trim();
+    final lower = message.toLowerCase();
+
+    if (lower.contains('jwt') ||
+        lower.contains('unauthorized') ||
+        lower.contains('invalid token')) {
+      return 'Your session has expired. Please log in again.';
+    }
+    if (lower.contains('spotify api did not return playlists')) {
+      return 'Spotify did not return playlists right now. Please try again.';
+    }
+    if (lower.contains('failed to save mood')) {
+      return 'Unable to save your mood right now. Please try again.';
+    }
+    if (lower.contains('failed to load mood history')) {
+      return 'Unable to load your mood history right now.';
+    }
+    if (lower.contains('failed to load playlists') ||
+        lower.contains('failed to load favorites')) {
+      return 'Unable to load your playlists right now.';
+    }
+    if (lower.contains('failed to save playlist') ||
+        lower.contains('failed to save tracks')) {
+      return 'Unable to save this playlist right now. Please try again.';
+    }
+    if (lower.contains('failed to like playlist') ||
+        lower.contains('failed to unlike playlist')) {
+      return 'Unable to update this playlist right now. Please try again.';
+    }
+    if (message.isEmpty) {
+      return 'Something went wrong. Please try again.';
+    }
+    return message;
   }
 
   Future<void> _cacheMoodEntry(String userId, MoodEntry entry) async {

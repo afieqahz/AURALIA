@@ -148,34 +148,32 @@ class _OfflineBarrier extends StatelessWidget {
     // which is required — Positioned only works as an immediate Stack
     // child, which is what caused the card not to show before.
     return Positioned.fill(
-      child: Stack(
-        children: [
-          // TEMPORARY DIAGNOSTIC: dim only, no blur. If the yellow fringe
-          // under the card's text is gone with this change, it confirms
-          // BackdropFilter itself is the trigger and we should redesign
-          // around a live blur here. If it's still there, blur was never
-          // the cause and we look elsewhere.
-          const Positioned.fill(
-            child: IgnorePointer(
-              child: ColoredBox(color: Color(0x73000000)),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Stack(
+          children: [
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: ColoredBox(color: Color(0x73000000)),
+              ),
             ),
-          ),
-          // Swallows every tap/scroll so nothing underneath is reachable.
-          const Positioned.fill(
-            child: AbsorbPointer(child: SizedBox.expand()),
-          ),
-          RepaintBoundary(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: ConnectionErrorCard(
-                  isRetrying: isRetrying,
-                  onRetry: onRetry,
+            // Swallows every tap/scroll so nothing underneath is reachable.
+            const Positioned.fill(
+              child: AbsorbPointer(child: SizedBox.expand()),
+            ),
+            RepaintBoundary(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: ConnectionErrorCard(
+                    isRetrying: isRetrying,
+                    onRetry: onRetry,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
