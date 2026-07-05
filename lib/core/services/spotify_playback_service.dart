@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:spotify_sdk/spotify_sdk.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../config/app_config.dart';
 import '../models/playlist.dart';
@@ -43,6 +44,12 @@ class SpotifyPlaybackService {
 
     try {
       lastError = null;
+      if (!await _isSpotifyAppAvailable()) {
+        lastError =
+            'Spotify app is required to play full tracks. Install Spotify, log in with Premium, then try again.';
+        return false;
+      }
+
       final authorized = await authorize();
       if (!authorized) {
         return false;
@@ -93,6 +100,17 @@ class SpotifyPlaybackService {
     } catch (error) {
       debugPrint('Spotify authorization failed: $error');
       lastError = _friendlySpotifyError(error);
+      return false;
+    }
+  }
+
+  Future<bool> _isSpotifyAppAvailable() async {
+    try {
+      return await canLaunchUrl(Uri.parse('spotify:')) ||
+          await canLaunchUrl(
+            Uri.parse('spotify:track:0VjIjW4GlUZAMYd2vXMi3b'),
+          );
+    } catch (_) {
       return false;
     }
   }
@@ -215,8 +233,10 @@ class SpotifyPlaybackService {
   String _friendlySpotifyError(Object error) {
     final message = error.toString();
     if (message.contains('CouldNotFindSpotifyApp') ||
-        message.contains('Spotify app is not installed')) {
-      return 'Spotify app is not installed. Install the normal Spotify app and log in.';
+        message.contains('Spotify app is not installed') ||
+        message.contains('MissingPluginException') ||
+        message.contains('No implementation found for method getAccessToken')) {
+      return 'Spotify app is required to play full tracks. Install Spotify, log in with Premium, then try again.';
     }
     if (message.contains('NotLoggedIn') || message.contains('logged in')) {
       return 'Spotify is not logged in. Open Spotify and log in with Premium.';
