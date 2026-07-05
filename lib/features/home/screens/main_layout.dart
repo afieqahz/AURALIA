@@ -357,76 +357,20 @@ class _MiniPlayerBar extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
             child: Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF7B3677).withValues(alpha: 0.22),
-                    Colors.white.withValues(alpha: 0.68),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: const Color(0xFFB984B7).withValues(alpha: 0.42),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF4A154B).withValues(alpha: 0.16),
-                    blurRadius: 22,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
+              decoration: _miniPlayerGlassDecoration(),
               child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
-                      width: 46,
-                      height: 46,
-                      child: activeTrack.imageUrl == null
-                          ? Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xFFAC7099),
-                                    Color(0xFF5A2C62),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.music_note_rounded,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Image.network(
-                              activeTrack.imageUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Container(
-                                color: const Color(0xFF5A2C62),
-                                child: const Icon(
-                                  Icons.music_note_rounded,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                      ),
-                    ),
-                  ),
+                  _MiniPlayerArtwork(imageUrl: activeTrack.imageUrl),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -455,39 +399,124 @@ class _MiniPlayerBar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  SizedBox(
-                    width: 42,
-                    height: 42,
-                    child: IconButton(
-                      onPressed: isBusy ? null : onTogglePlayback,
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFF5A2C62),
-                        disabledBackgroundColor: const Color(0xFFB894BA),
-                        foregroundColor: Colors.white,
-                        disabledForegroundColor: Colors.white,
-                      ),
-                      icon: isBusy
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Icon(
-                              isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              size: 24,
-                            ),
-                    ),
+                  _MiniPlayerToggleButton(
+                    isBusy: isBusy,
+                    isPlaying: isPlaying,
+                    onPressed: onTogglePlayback,
                   ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  BoxDecoration _miniPlayerGlassDecoration() {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          const Color(0xFF7B3677).withValues(alpha: 0.22),
+          Colors.white.withValues(alpha: 0.68),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(
+        color: const Color(0xFFB984B7).withValues(alpha: 0.42),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFF4A154B).withValues(alpha: 0.16),
+          blurRadius: 22,
+          offset: const Offset(0, 10),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniPlayerArtwork extends StatelessWidget {
+  const _MiniPlayerArtwork({required this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 46,
+        height: 46,
+        child: imageUrl == null
+            ? Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFAC7099), Color(0xFF5A2C62)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.music_note_rounded,
+                  color: Colors.white,
+                ),
+              )
+            : Image.network(
+                imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Container(
+                  color: const Color(0xFF5A2C62),
+                  child: const Icon(
+                    Icons.music_note_rounded,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _MiniPlayerToggleButton extends StatelessWidget {
+  const _MiniPlayerToggleButton({
+    required this.isBusy,
+    required this.isPlaying,
+    required this.onPressed,
+  });
+
+  final bool isBusy;
+  final bool isPlaying;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 42,
+      height: 42,
+      child: IconButton(
+        onPressed: isBusy ? null : onPressed,
+        style: IconButton.styleFrom(
+          backgroundColor: const Color(0xFF5A2C62),
+          disabledBackgroundColor: const Color(0xFFB894BA),
+          foregroundColor: Colors.white,
+          disabledForegroundColor: Colors.white,
+        ),
+        icon: isBusy
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Icon(
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                size: 24,
+              ),
       ),
     );
   }
