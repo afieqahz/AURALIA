@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auralia_app/core/models/playlist.dart' show AuraliaTrack;
+import 'package:auralia_app/core/services/auralia_state.dart';
 import 'package:auralia_app/core/services/auralia_scope.dart';
 import 'package:auralia_app/core/services/spotify_playback_service.dart';
+import 'package:auralia_app/features/auth/screens/auth_screen.dart';
 import 'package:auralia_app/features/mood_tracking/screens/home_dashboard_screen.dart';
 import 'package:auralia_app/features/music_player/screens/music_player_screen.dart';
 import 'package:auralia_app/features/mood_tracking/screens/analytics_screen.dart';
@@ -21,6 +23,7 @@ class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
   bool _showPlayer = false;
   bool _hasShownSpotifyPrompt = false;
+  bool _isMiniPlayerBusy = false;
 
   @override
   void initState() {
@@ -38,6 +41,11 @@ class _MainLayoutState extends State<MainLayout> {
     final screens = [
       HomeDashboardScreen(
         onOpenPlayer: () => setState(() => _showPlayer = true),
+        onOpenProfile: () => setState(() {
+          _showPlayer = false;
+          _currentIndex = 2;
+        }),
+        onLogout: _confirmLogout,
       ),
       const AnalyticsScreen(),
       const ProfileScreen(),
@@ -75,10 +83,12 @@ class _MainLayoutState extends State<MainLayout> {
                 child: _MiniPlayerBar(
                   track: state.activeTrack,
                   isPlaying: state.isPlaybackPlaying,
+                  isBusy: _isMiniPlayerBusy,
                   onTap: () {
                     state.openActivePlaybackPlaylist();
                     setState(() => _showPlayer = true);
                   },
+                  onTogglePlayback: () => _toggleMiniPlayerPlayback(state),
                 ),
               ),
           ],
@@ -236,18 +246,107 @@ class _MainLayoutState extends State<MainLayout> {
       },
     );
   }
+
+  Future<void> _toggleMiniPlayerPlayback(AuraliaState state) async {
+    if (_isMiniPlayerBusy || state.activeTrack == null) {
+      return;
+    }
+
+    setState(() => _isMiniPlayerBusy = true);
+    final shouldPause = state.isPlaybackPlaying;
+    final success = shouldPause
+        ? await _spotifyPlaybackService.pause()
+        : await _spotifyPlaybackService.resume();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _isMiniPlayerBusy = false);
+
+    if (success) {
+      state.updatePlaybackState(
+        activeTrackIndex: state.activeTrackIndex,
+        isPlaying: !shouldPause,
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _spotifyPlaybackService.lastError ??
+              'Unable to control Spotify playback right now.',
+        ),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+  }
+
+  Future<void> _confirmLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          'Log out?',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF38143E),
+          ),
+        ),
+        content: Text(
+          'You will need to sign in again to access your saved mood history and playlists.',
+          style: GoogleFonts.poppins(fontSize: 13, color: Colors.black54),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF8C3343),
+            ),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout != true || !mounted) {
+      return;
+    }
+
+    final state = AuraliaScope.of(context);
+    await _spotifyPlaybackService.disconnect();
+    await state.signOut();
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthScreen()),
+      (_) => false,
+    );
+  }
 }
 
 class _MiniPlayerBar extends StatelessWidget {
   const _MiniPlayerBar({
     required this.track,
     required this.isPlaying,
+    required this.isBusy,
     required this.onTap,
+    required this.onTogglePlayback,
   });
 
   final AuraliaTrack? track;
   final bool isPlaying;
+  final bool isBusy;
   final VoidCallback onTap;
+  final VoidCallback onTogglePlayback;
 
   @override
   Widget build(BuildContext context) {
@@ -337,17 +436,32 @@ class _MiniPlayerBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF5A2C62),
-                ),
-                child: Icon(
-                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 24,
+              SizedBox(
+                width: 42,
+                height: 42,
+                child: IconButton(
+                  onPressed: isBusy ? null : onTogglePlayback,
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFF5A2C62),
+                    disabledBackgroundColor: const Color(0xFFB894BA),
+                    foregroundColor: Colors.white,
+                    disabledForegroundColor: Colors.white,
+                  ),
+                  icon: isBusy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(
+                          isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 24,
+                        ),
                 ),
               ),
             ],

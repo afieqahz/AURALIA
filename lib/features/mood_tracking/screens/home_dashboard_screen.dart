@@ -7,9 +7,16 @@ import 'package:auralia_app/core/widgets/floating_bubbles.dart';
 import 'package:auralia_app/features/mood_tracking/screens/auralia_chat_screen.dart';
 
 class HomeDashboardScreen extends StatefulWidget {
-  const HomeDashboardScreen({super.key, this.onOpenPlayer});
+  const HomeDashboardScreen({
+    super.key,
+    this.onOpenPlayer,
+    this.onOpenProfile,
+    this.onLogout,
+  });
 
   final VoidCallback? onOpenPlayer;
+  final VoidCallback? onOpenProfile;
+  final VoidCallback? onLogout;
 
   @override
   State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
@@ -65,14 +72,75 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: const Color(0xFFE2D1DF),
-                child: Text(
-                  _initialFor(state.currentUser?.name),
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF5A2C62),
+              PopupMenuButton<_AvatarMenuAction>(
+                tooltip: 'Account',
+                color: Colors.white,
+                elevation: 10,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                offset: const Offset(0, 52),
+                onSelected: (action) {
+                  switch (action) {
+                    case _AvatarMenuAction.profile:
+                      widget.onOpenProfile?.call();
+                      break;
+                    case _AvatarMenuAction.logout:
+                      widget.onLogout?.call();
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: _AvatarMenuAction.profile,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.person_rounded,
+                          color: Color(0xFF5A2C62),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Profile',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF38143E),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _AvatarMenuAction.logout,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.logout_rounded,
+                          color: Color(0xFF8C3343),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Log out',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF8C3343),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: const Color(0xFFE2D1DF),
+                  child: Text(
+                    _initialFor(state.currentUser?.name),
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF5A2C62),
+                    ),
                   ),
                 ),
               ),
@@ -256,6 +324,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     return trimmed.isEmpty ? 'A' : trimmed.substring(0, 1).toUpperCase();
   }
 }
+
+enum _AvatarMenuAction { profile, logout }
 
 class _AuraliaHeroCard extends StatefulWidget {
   const _AuraliaHeroCard({required this.onTap});
