@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -675,74 +677,90 @@ class _ContinueListeningCard extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4A154B).withValues(alpha: 0.08),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            _ArtworkBox(imageUrl: track.imageUrl, size: 64, radius: 16),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    playlist.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.black45,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    track.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF38143E),
-                    ),
-                  ),
-                  Text(
-                    track.artist,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.black45,
-                    ),
-                  ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF7B3677).withValues(alpha: 0.20),
+                  Colors.white.withValues(alpha: 0.70),
                 ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFB984B7).withValues(alpha: 0.42),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4A154B).withValues(alpha: 0.12),
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFF6E2D72),
-              ),
-              child: Icon(
-                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: Colors.white,
-                size: 28,
-              ),
+            child: Row(
+              children: [
+                _ArtworkBox(imageUrl: track.imageUrl, size: 64, radius: 16),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        playlist.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: const Color(0xFF6E5870),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        track.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF38143E),
+                        ),
+                      ),
+                      Text(
+                        track.artist,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: const Color(0xFF6E5870),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFF6E2D72),
+                  ),
+                  child: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -946,114 +964,125 @@ class _RecommendedPlaylistCard extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
-      child: Container(
-        width: 218,
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Colors.white, Color(0xFFFCF7FD)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2D1DF)),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4A154B).withValues(alpha: 0.08),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _ArtworkBox(imageUrl: imageUrl, size: 56, radius: 14),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Suggested mix',
-                        style: GoogleFonts.poppins(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF6E2D72),
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        playlist.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          height: 1.15,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF38143E),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF5A2C62),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    size: 22,
-                    color: Colors.white,
-                  ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            width: 218,
+            padding: const EdgeInsets.all(13),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF7B3677).withValues(alpha: 0.18),
+                  Colors.white.withValues(alpha: 0.72),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFB984B7).withValues(alpha: 0.40),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4A154B).withValues(alpha: 0.12),
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              playlist.summary,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.poppins(
-                fontSize: 10.5,
-                height: 1.3,
-                color: Colors.black45,
-              ),
-            ),
-            const Spacer(),
-            Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 14,
-                  color: Color(0xFF5A2C62),
+                Row(
+                  children: [
+                    _ArtworkBox(imageUrl: imageUrl, size: 56, radius: 14),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Suggested mix',
+                            style: GoogleFonts.poppins(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF6E2D72),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            playlist.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              height: 1.15,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF38143E),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF5A2C62),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        size: 22,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(height: 12),
                 Text(
-                  '${playlist.tracks.length} tracks',
+                  playlist.summary,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF5A2C62),
+                    height: 1.3,
+                    color: const Color(0xFF6E5870),
                   ),
                 ),
                 const Spacer(),
-                Text(
-                  'Tap to play',
-                  style: GoogleFonts.poppins(
-                    fontSize: 10,
-                    color: Colors.black38,
-                  ),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 14,
+                      color: Color(0xFF5A2C62),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '${playlist.tracks.length} tracks',
+                      style: GoogleFonts.poppins(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF5A2C62),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'Tap to play',
+                      style: GoogleFonts.poppins(
+                        fontSize: 10,
+                        color: const Color(0xFF8A718E),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

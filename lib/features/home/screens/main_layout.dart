@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auralia_app/core/models/playlist.dart' show AuraliaTrack;
@@ -360,111 +362,130 @@ class _MiniPlayerBar extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2D1DF)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF4A154B).withValues(alpha: 0.16),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 46,
-                  height: 46,
-                  child: activeTrack.imageUrl == null
-                      ? Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFFAC7099), Color(0xFF5A2C62)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.music_note_rounded,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Image.network(
-                          activeTrack.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
-                            color: const Color(0xFF5A2C62),
-                            child: const Icon(
-                              Icons.music_note_rounded,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      activeTrack.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF38143E),
-                      ),
-                    ),
-                    Text(
-                      activeTrack.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: Colors.black45,
-                      ),
-                    ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF7B3677).withValues(alpha: 0.22),
+                    Colors.white.withValues(alpha: 0.68),
                   ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 42,
-                height: 42,
-                child: IconButton(
-                  onPressed: isBusy ? null : onTogglePlayback,
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFF5A2C62),
-                    disabledBackgroundColor: const Color(0xFFB894BA),
-                    foregroundColor: Colors.white,
-                    disabledForegroundColor: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: const Color(0xFFB984B7).withValues(alpha: 0.42),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF4A154B).withValues(alpha: 0.16),
+                    blurRadius: 22,
+                    offset: const Offset(0, 10),
                   ),
-                  icon: isBusy
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Icon(
-                          isPlaying
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          size: 24,
-                        ),
-                ),
+                ],
               ),
-            ],
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 46,
+                      height: 46,
+                      child: activeTrack.imageUrl == null
+                          ? Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Color(0xFFAC7099),
+                                    Color(0xFF5A2C62),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.music_note_rounded,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Image.network(
+                              activeTrack.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Container(
+                                color: const Color(0xFF5A2C62),
+                                child: const Icon(
+                                  Icons.music_note_rounded,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          activeTrack.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF38143E),
+                          ),
+                        ),
+                        Text(
+                          activeTrack.artist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: const Color(0xFF6E5870),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 42,
+                    height: 42,
+                    child: IconButton(
+                      onPressed: isBusy ? null : onTogglePlayback,
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFF5A2C62),
+                        disabledBackgroundColor: const Color(0xFFB894BA),
+                        foregroundColor: Colors.white,
+                        disabledForegroundColor: Colors.white,
+                      ),
+                      icon: isBusy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Icon(
+                              isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              size: 24,
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

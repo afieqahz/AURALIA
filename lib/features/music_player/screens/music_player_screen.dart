@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:auralia_app/core/config/app_config.dart';
 import 'package:auralia_app/core/models/mood.dart';
 import 'package:auralia_app/core/models/playlist.dart';
+import 'package:auralia_app/core/services/auralia_state.dart';
 import 'package:auralia_app/core/services/auralia_scope.dart';
 import 'package:auralia_app/core/services/spotify_playback_service.dart';
 
@@ -170,7 +171,18 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
             ],
           ),
           const SizedBox(height: 20),
-          _PlaylistNameLabel(name: playlist.name),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(child: _PlaylistNameLabel(name: playlist.name)),
+              const SizedBox(width: 8),
+              _SavePlaylistIconButton(
+                isSaved: state.isCurrentPlaylistLiked,
+                isBusy: state.isBusy,
+                onPressed: () => _toggleSavePlaylist(state),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           _NowPlayingArtworkCard(
             artworkUrl: artworkUrl,
@@ -224,7 +236,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
             )
           else
             _PreviewProgressBar(audioPlayer: _audioPlayer),
-          const SizedBox(height: 18),
+          const SizedBox(height: 8),
           _PlayerControlDeck(
             isPlaying: _isPlaying,
             isConnecting: _isConnectingSpotify,
@@ -235,50 +247,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
             onNext: _playNext,
           ),
           const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: state.isBusy
-                      ? null
-                      : () async {
-                          final wasSaved = state.isCurrentPlaylistLiked;
-                          final saved = wasSaved
-                              ? await state.toggleCurrentPlaylistFavorite()
-                              : await state.saveCurrentPlaylist();
-                          if (!context.mounted) {
-                            return;
-                          }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                saved
-                                    ? wasSaved
-                                          ? 'Removed from favourites.'
-                                          : 'Playlist saved.'
-                                    : state.errorMessage ??
-                                          'Unable to save playlist.',
-                              ),
-                              backgroundColor: saved
-                                  ? const Color(0xFF4A154B)
-                                  : Colors.redAccent,
-                            ),
-                          );
-                        },
-                  icon: Icon(
-                    state.isCurrentPlaylistLiked
-                        ? Icons.check_circle_rounded
-                        : Icons.bookmark_add_rounded,
-                  ),
-                  label: Text(
-                    state.isCurrentPlaylistLiked ? 'Saved' : 'Save',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 28),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -355,6 +323,33 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
     }
 
     await _playActiveTrack();
+  }
+
+  Future<void> _toggleSavePlaylist(AuraliaState state) async {
+    if (state.isBusy) {
+      return;
+    }
+
+    final wasSaved = state.isCurrentPlaylistLiked;
+    final saved = wasSaved
+        ? await state.toggleCurrentPlaylistFavorite()
+        : await state.saveCurrentPlaylist();
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved
+              ? wasSaved
+                    ? 'Removed from favourites.'
+                    : 'Playlist saved.'
+              : state.errorMessage ?? 'Unable to save playlist.',
+        ),
+        backgroundColor: saved ? const Color(0xFF4A154B) : Colors.redAccent,
+      ),
+    );
   }
 
   String? _firstPlaylistArtwork(AuraliaPlaylist playlist) {
@@ -1221,6 +1216,45 @@ class _PlaylistNameLabel extends StatelessWidget {
   }
 }
 
+class _SavePlaylistIconButton extends StatelessWidget {
+  const _SavePlaylistIconButton({
+    required this.isSaved,
+    required this.isBusy,
+    required this.onPressed,
+  });
+
+  final bool isSaved;
+  final bool isBusy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: isSaved ? 'Saved' : 'Save playlist',
+      child: SizedBox(
+        width: 38,
+        height: 38,
+        child: IconButton(
+          onPressed: isBusy ? null : onPressed,
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white.withValues(alpha: 0.9),
+            disabledBackgroundColor: const Color(0xFFF0E5F0),
+            foregroundColor: const Color(0xFF5A2C62),
+            disabledForegroundColor: const Color(0xFFB090B6),
+            shape: const CircleBorder(),
+            side: const BorderSide(color: Color(0xFFE8D8EA)),
+            padding: EdgeInsets.zero,
+          ),
+          icon: Icon(
+            isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NowPlayingArtworkCard extends StatelessWidget {
   const _NowPlayingArtworkCard({
     required this.artworkUrl,
@@ -1409,12 +1443,12 @@ class _PlayerControlDeck extends StatelessWidget {
         _RoundControlButton(
           icon: Icons.skip_previous_rounded,
           onTap: onPrevious,
-          size: 52,
+          size: 44,
         ),
-        const SizedBox(width: 26),
+        const SizedBox(width: 20),
         Container(
-          width: 78,
-          height: 78,
+          width: 64,
+          height: 64,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: const LinearGradient(
@@ -1429,8 +1463,8 @@ class _PlayerControlDeck extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF5A2C62).withValues(alpha: 0.36),
-                blurRadius: 24,
-                offset: const Offset(0, 14),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
               ),
               BoxShadow(
                 color: Colors.white.withValues(alpha: 0.45),
@@ -1446,17 +1480,17 @@ class _PlayerControlDeck extends StatelessWidget {
                   : isPlaying
                   ? Icons.pause_rounded
                   : Icons.play_arrow_rounded,
-              size: 40,
+              size: 34,
               color: Colors.white,
             ),
             onPressed: onToggle,
           ),
         ),
-        const SizedBox(width: 26),
+        const SizedBox(width: 20),
         _RoundControlButton(
           icon: Icons.skip_next_rounded,
           onTap: onNext,
-          size: 52,
+          size: 44,
         ),
       ],
     );
@@ -1489,15 +1523,15 @@ class _RoundControlButton extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF6E2D72).withValues(alpha: 0.10),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Icon(
           icon,
           color: const Color(0xFF5A2C62),
-          size: 30,
+          size: 26,
         ),
       ),
     );
