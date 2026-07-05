@@ -1248,7 +1248,7 @@ class _NowPlayingArtworkCard extends StatelessWidget {
             height: artworkSize,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.zero,
               color: const Color(0xFFF4E7F4),
               border: Border.all(color: Colors.white, width: 3),
               boxShadow: [
