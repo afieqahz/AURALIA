@@ -224,6 +224,16 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
             )
           else
             _PreviewProgressBar(audioPlayer: _audioPlayer),
+          const SizedBox(height: 18),
+          _PlayerControlDeck(
+            isPlaying: _isPlaying,
+            isConnecting: _isConnectingSpotify,
+            onPrevious: _playPrevious,
+            onToggle: _isConnectingSpotify
+                ? null
+                : () => _togglePlayback(activeTrack),
+            onNext: _playNext,
+          ),
           const SizedBox(height: 24),
           Row(
             children: [
@@ -267,16 +277,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 24),
-          _PlayerControlDeck(
-            isPlaying: _isPlaying,
-            isConnecting: _isConnectingSpotify,
-            onPrevious: _playPrevious,
-            onToggle: _isConnectingSpotify
-                ? null
-                : () => _togglePlayback(activeTrack),
-            onNext: _playNext,
           ),
           const SizedBox(height: 28),
           Align(
@@ -1403,86 +1403,62 @@ class _PlayerControlDeck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFFFFF), Color(0xFFF9EFF8)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _RoundControlButton(
+          icon: Icons.skip_previous_rounded,
+          onTap: onPrevious,
+          size: 52,
         ),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white, width: 1.4),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4A154B).withValues(alpha: 0.12),
-            blurRadius: 28,
-            offset: const Offset(0, 16),
-          ),
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.95),
-            blurRadius: 16,
-            offset: const Offset(-4, -6),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _RoundControlButton(
-            icon: Icons.skip_previous_rounded,
-            onTap: onPrevious,
-            size: 52,
-          ),
-          const SizedBox(width: 24),
-          Container(
-            width: 78,
-            height: 78,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF9B4AA3),
-                  Color(0xFF6E2D72),
-                  Color(0xFF3C103F),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF5A2C62).withValues(alpha: 0.36),
-                  blurRadius: 24,
-                  offset: const Offset(0, 14),
-                ),
-                BoxShadow(
-                  color: Colors.white.withValues(alpha: 0.45),
-                  blurRadius: 12,
-                  offset: const Offset(-4, -5),
-                ),
+        const SizedBox(width: 26),
+        Container(
+          width: 78,
+          height: 78,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF9B4AA3),
+                Color(0xFF6E2D72),
+                Color(0xFF3C103F),
               ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            child: IconButton(
-              icon: Icon(
-                isConnecting
-                    ? Icons.more_horiz_rounded
-                    : isPlaying
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
-                size: 40,
-                color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF5A2C62).withValues(alpha: 0.36),
+                blurRadius: 24,
+                offset: const Offset(0, 14),
               ),
-              onPressed: onToggle,
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.45),
+                blurRadius: 12,
+                offset: const Offset(-4, -5),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: Icon(
+              isConnecting
+                  ? Icons.more_horiz_rounded
+                  : isPlaying
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
+              size: 40,
+              color: Colors.white,
             ),
+            onPressed: onToggle,
           ),
-          const SizedBox(width: 24),
-          _RoundControlButton(
-            icon: Icons.skip_next_rounded,
-            onTap: onNext,
-            size: 52,
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 26),
+        _RoundControlButton(
+          icon: Icons.skip_next_rounded,
+          onTap: onNext,
+          size: 52,
+        ),
+      ],
     );
   }
 }
