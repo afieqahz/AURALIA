@@ -276,7 +276,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     imageUrl: imageUrl,
                     onTap: () {
                       state.selectPlaylist(playlist);
-                      state.playCurrentPlaylist();
                       widget.onOpenPlayer?.call();
                     },
                   );
@@ -1072,7 +1071,7 @@ class _RecommendedPlaylistCard extends StatelessWidget {
                     ),
                     const Spacer(),
                     Text(
-                      'Tap to play',
+                      'Tap to open',
                       style: GoogleFonts.poppins(
                         fontSize: 10,
                         color: const Color(0xFF8A718E),

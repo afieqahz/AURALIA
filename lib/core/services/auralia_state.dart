@@ -871,6 +871,8 @@ class AuraliaState extends ChangeNotifier {
   }
 
   Future<bool> saveCurrentPlaylist() async {
+    _attachExistingPlaylistIdIfAvailable();
+
     if (_currentPlaylistId != null) {
       if (!_isCurrentPlaylistLiked) {
         return _runBusyTask(() async {
@@ -924,6 +926,8 @@ class AuraliaState extends ChangeNotifier {
   }
 
   Future<bool> toggleCurrentPlaylistFavorite() async {
+    _attachExistingPlaylistIdIfAvailable();
+
     if (_currentPlaylistId == null) {
       return saveCurrentPlaylist();
     }
@@ -931,11 +935,26 @@ class AuraliaState extends ChangeNotifier {
     return _runBusyTask(() async {
       final userId = currentUser?.id ?? 'local-user';
       final liked = !_isCurrentPlaylistLiked;
+      final duplicateFavoriteIds = _favoritePlaylists
+          .where((playlist) => _samePlaylist(playlist, _currentPlaylist))
+          .map((playlist) => playlist.databaseId)
+          .whereType<int>()
+          .where((playlistId) => playlistId != _currentPlaylistId)
+          .toSet();
       await _playlistRepository.setFavorite(
         userId: userId,
         playlistId: _currentPlaylistId!,
         liked: liked,
       );
+      if (!liked) {
+        for (final playlistId in duplicateFavoriteIds) {
+          await _playlistRepository.setFavorite(
+            userId: userId,
+            playlistId: playlistId,
+            liked: false,
+          );
+        }
+      }
       _isCurrentPlaylistLiked = liked;
       if (liked) {
         _favoritePlaylists.removeWhere(
@@ -965,15 +984,31 @@ class AuraliaState extends ChangeNotifier {
 
     return _runBusyTask(() async {
       final userId = currentUser?.id ?? 'local-user';
+      final duplicateFavoriteIds = _favoritePlaylists
+          .where((favorite) => _samePlaylist(favorite, playlist))
+          .map((favorite) => favorite.databaseId)
+          .whereType<int>()
+          .where((favoriteId) => favoriteId != playlistId)
+          .toSet();
       await _playlistRepository.setFavorite(
         userId: userId,
         playlistId: playlistId,
         liked: false,
       );
+      for (final duplicateId in duplicateFavoriteIds) {
+        await _playlistRepository.setFavorite(
+          userId: userId,
+          playlistId: duplicateId,
+          liked: false,
+        );
+      }
       _favoritePlaylists.removeWhere(
-        (favorite) => favorite.databaseId == playlistId,
+        (favorite) =>
+            favorite.databaseId == playlistId ||
+            _samePlaylist(favorite, playlist),
       );
-      if (_currentPlaylistId == playlistId) {
+      if (_currentPlaylistId == playlistId ||
+          _samePlaylist(_currentPlaylist, playlist)) {
         _isCurrentPlaylistLiked = false;
       }
     });
@@ -1138,10 +1173,71 @@ class AuraliaState extends ChangeNotifier {
   }
 
   bool _samePlaylist(AuraliaPlaylist first, AuraliaPlaylist second) {
-    if (first.databaseId != null && second.databaseId != null) {
-      return first.databaseId == second.databaseId;
+    if (first.databaseId != null &&
+        second.databaseId != null &&
+        first.databaseId == second.databaseId) {
+      return true;
     }
-    return first.fingerprint == second.fingerprint;
+    if (first.fingerprint == second.fingerprint) {
+      return true;
+    }
+    if (first.sourceMood != second.sourceMood ||
+        _normalizedPlaylistName(first.name) !=
+            _normalizedPlaylistName(second.name)) {
+      return false;
+    }
+
+    final firstKeys = first.tracks.map(_trackIdentityKey).toSet();
+    final secondKeys = second.tracks.map(_trackIdentityKey).toSet();
+    firstKeys.remove('');
+    secondKeys.remove('');
+    if (firstKeys.isEmpty || secondKeys.isEmpty) {
+      return false;
+    }
+
+    final overlap = firstKeys.intersection(secondKeys).length;
+    return overlap >= 3 ||
+        overlap == firstKeys.length ||
+        overlap == secondKeys.length;
+  }
+
+  void _attachExistingPlaylistIdIfAvailable() {
+    if (_currentPlaylistId != null) {
+      return;
+    }
+
+    for (final playlist in [
+      ..._favoritePlaylists,
+      ..._savedPlaylists,
+      ..._playlistOptions,
+    ]) {
+      final playlistId = playlist.databaseId;
+      if (playlistId != null && _samePlaylist(playlist, _currentPlaylist)) {
+        _currentPlaylistId = playlistId;
+        _currentPlaylist = _currentPlaylist.copyWithDatabaseId(playlistId);
+        _isCurrentPlaylistLiked = _favoritePlaylists.any(
+          (favorite) => _samePlaylist(favorite, _currentPlaylist),
+        );
+        return;
+      }
+    }
+  }
+
+  String _normalizedPlaylistName(String value) {
+    return value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  String _trackIdentityKey(AuraliaTrack track) {
+    final id = track.id?.trim();
+    if (id != null && id.isNotEmpty) {
+      return 'id:$id';
+    }
+    final title = track.title.trim().toLowerCase();
+    final artist = track.artist.trim().toLowerCase();
+    if (title.isEmpty && artist.isEmpty) {
+      return '';
+    }
+    return 'text:$title|$artist';
   }
 
   static AuthService _createDefaultAuthService() {
