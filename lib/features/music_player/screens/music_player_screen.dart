@@ -170,6 +170,8 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
             ],
           ),
           const SizedBox(height: 20),
+          _PlaylistNameLabel(name: playlist.name),
+          const SizedBox(height: 12),
           _NowPlayingArtworkCard(
             artworkUrl: artworkUrl,
             isPlaying: _isPlaying,
@@ -1170,6 +1172,55 @@ class _PlaybackFallbackPanel extends StatelessWidget {
   }
 }
 
+class _PlaylistNameLabel extends StatelessWidget {
+  const _PlaylistNameLabel({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 292),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE8D8EA)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4A154B).withValues(alpha: 0.07),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.queue_music_rounded,
+            size: 15,
+            color: Color(0xFF6E2D72),
+          ),
+          const SizedBox(width: 7),
+          Flexible(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF4A154B),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _NowPlayingArtworkCard extends StatelessWidget {
   const _NowPlayingArtworkCard({
     required this.artworkUrl,
@@ -1197,7 +1248,7 @@ class _NowPlayingArtworkCard extends StatelessWidget {
             height: artworkSize,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(18),
               color: const Color(0xFFF4E7F4),
               border: Border.all(color: Colors.white, width: 3),
               boxShadow: [
@@ -1353,16 +1404,25 @@ class _PlayerControlDeck extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFE8D8EA)),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFFFFF), Color(0xFFF9EFF8)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: Colors.white, width: 1.4),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4A154B).withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: const Color(0xFF4A154B).withValues(alpha: 0.12),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.95),
+            blurRadius: 16,
+            offset: const Offset(-4, -6),
           ),
         ],
       ),
@@ -1372,24 +1432,33 @@ class _PlayerControlDeck extends StatelessWidget {
           _RoundControlButton(
             icon: Icons.skip_previous_rounded,
             onTap: onPrevious,
-            isPrimary: false,
+            size: 52,
           ),
-          const SizedBox(width: 22),
+          const SizedBox(width: 24),
           Container(
-            width: 76,
-            height: 76,
+            width: 78,
+            height: 78,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [Color(0xFF7D3B84), Color(0xFF4A154B)],
+                colors: [
+                  Color(0xFF9B4AA3),
+                  Color(0xFF6E2D72),
+                  Color(0xFF3C103F),
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF5A2C62).withValues(alpha: 0.28),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
+                  color: const Color(0xFF5A2C62).withValues(alpha: 0.36),
+                  blurRadius: 24,
+                  offset: const Offset(0, 14),
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.45),
+                  blurRadius: 12,
+                  offset: const Offset(-4, -5),
                 ),
               ],
             ),
@@ -1400,17 +1469,17 @@ class _PlayerControlDeck extends StatelessWidget {
                     : isPlaying
                     ? Icons.pause_rounded
                     : Icons.play_arrow_rounded,
-                size: 38,
+                size: 40,
                 color: Colors.white,
               ),
               onPressed: onToggle,
             ),
           ),
-          const SizedBox(width: 22),
+          const SizedBox(width: 24),
           _RoundControlButton(
             icon: Icons.skip_next_rounded,
             onTap: onNext,
-            isPrimary: false,
+            size: 52,
           ),
         ],
       ),
@@ -1422,12 +1491,12 @@ class _RoundControlButton extends StatelessWidget {
   const _RoundControlButton({
     required this.icon,
     required this.onTap,
-    required this.isPrimary,
+    required this.size,
   });
 
   final IconData icon;
   final VoidCallback onTap;
-  final bool isPrimary;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -1435,15 +1504,23 @@ class _RoundControlButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        width: 48,
-        height: 48,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
-          color: isPrimary ? const Color(0xFF5A2C62) : const Color(0xFFF4EAF5),
+          color: Colors.white,
           shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFEADDEA)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6E2D72).withValues(alpha: 0.10),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Icon(
           icon,
-          color: isPrimary ? Colors.white : const Color(0xFF38143E),
+          color: const Color(0xFF5A2C62),
           size: 30,
         ),
       ),
