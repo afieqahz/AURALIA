@@ -187,11 +187,15 @@ class SpotifyTrackDetailsService {
     final externalUrls =
         spotifyTrack?['external_urls'] as Map<String, dynamic>?;
     final oembedImage = id == null ? null : artworkById[id];
+    final spotifyTitle = spotifyTrack?['name']?.toString();
+    final spotifyArtist = spotifyTrack == null ? null : _artistsFrom(spotifyTrack);
 
     return AuraliaTrack(
       id: track.id,
-      title: spotifyTrack?['name']?.toString() ?? track.title,
-      artist: spotifyTrack == null ? track.artist : _artistsFrom(spotifyTrack),
+      title: _usableSpotifyTitle(spotifyTitle) ? spotifyTitle! : track.title,
+      artist: _usableSpotifyArtist(spotifyArtist)
+          ? spotifyArtist!
+          : track.artist,
       stage: track.stage,
       valence: track.valence,
       energy: track.energy,
@@ -200,6 +204,21 @@ class SpotifyTrackDetailsService {
       externalUrl: externalUrls?['spotify']?.toString() ?? track.externalUrl,
       durationMs: _toInt(spotifyTrack?['duration_ms']) ?? track.durationMs,
     );
+  }
+
+  bool _usableSpotifyTitle(String? title) {
+    if (title == null || title.trim().isEmpty) {
+      return false;
+    }
+    return title.trim().toLowerCase() != 'spotify track';
+  }
+
+  bool _usableSpotifyArtist(String? artist) {
+    if (artist == null || artist.trim().isEmpty) {
+      return false;
+    }
+    final normalized = artist.trim().toLowerCase();
+    return normalized != 'spotify' && normalized != 'unknown artist';
   }
 
   String _artistsFrom(Map<String, dynamic> spotifyTrack) {
