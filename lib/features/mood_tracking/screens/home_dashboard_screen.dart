@@ -154,7 +154,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           _HomePulseStrip(
             savedCount: favorites.length,
             moodEntryCount: state.moodEntryCount,
-            playlistCount: state.savedPlaylists.length,
           ),
           if (state.hasActivePlayback && activeTrack != null) ...[
             const SizedBox(height: 28),
@@ -576,12 +575,10 @@ class _HomePulseStrip extends StatelessWidget {
   const _HomePulseStrip({
     required this.savedCount,
     required this.moodEntryCount,
-    required this.playlistCount,
   });
 
   final int savedCount;
   final int moodEntryCount;
-  final int playlistCount;
 
   @override
   Widget build(BuildContext context) {
@@ -600,14 +597,6 @@ class _HomePulseStrip extends StatelessWidget {
             icon: Icons.auto_graph_rounded,
             value: '$moodEntryCount',
             label: 'Mood logs',
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _PulseTile(
-            icon: Icons.queue_music_rounded,
-            value: '$playlistCount',
-            label: 'Playlists',
           ),
         ),
       ],
