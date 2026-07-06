@@ -88,10 +88,12 @@ async def _spotify_token() -> dict[str, Any]:
 async def spotify_search(
     q: str = Query(..., min_length=1),
     allow_fallback: bool = Query(True),
-    mood: str = Query("neutral")
+    mood: str = Query("neutral"),
+    target_mood: str = Query(""),
 ) -> dict[str, Any]:
     mood = mood.strip().lower()
-    cache_key = f"{q.strip().lower()}|fallback={allow_fallback}|mood={mood}"
+    target_mood = target_mood.strip().lower() or _default_target_mood(mood)
+    cache_key = f"{q.strip().lower()}|fallback={allow_fallback}|mood={mood}|target={target_mood}"
     cached = _spotify_search_cache.get(cache_key)
     now = time.time()
     if cached and cached[0] > now:
@@ -109,14 +111,19 @@ async def spotify_search(
     ranked_items = _rank_mainstream_tracks(items)
     ranked_items = _dedupe_tracks(ranked_items)
 
+    # NOTE: this sort is only used for the flat "items" list returned to the
+    # app (e.g. for a generic browse view). It must NOT be used to build the
+    # Iso-Principle sequence below, because sorting everything by a single
+    # mood score before slicing gave no guarantee that the tail of the list
+    # trended toward the target mood - see _build_iso_playlist for the fix.
     ranked_items = sorted(
-    ranked_items,
-    key=lambda t: _mood_boost(t, mood),
-    reverse=True
+        ranked_items,
+        key=lambda t: _mood_boost(t, mood),
+        reverse=True
     )
 
-    iso_playlist = _build_iso_playlist(ranked_items, mood)
-   
+    iso_playlist = _build_iso_playlist(ranked_items, mood, target_mood)
+
     data["tracks"] = {
     "href": data.get("tracks", {}).get("href", ""),
     "limit": 30,
@@ -136,6 +143,8 @@ async def spotify_search(
     ):
         _spotify_search_cache[cache_key] = (now + _spotify_search_cache_ttl, data)
     return data
+
+
 
 
 @app.get("/spotify/tracks")
@@ -693,29 +702,97 @@ def _album_images(image_url: Any) -> list[dict[str, Any]]:
         {"url": image_url, "height": 64, "width": 64},
     ]
 
+def _default_target_mood(mood: str) -> str:
+    """
+    Where the Iso-Principle sequence should end up if the app/client did not
+    explicitly send a target_mood. This mirrors the "gentle lift" behaviour
+    already described to users in the AURALIA chat (e.g. a neutral mood gets
+    a light lift rather than staying flat, a sad mood is walked toward happy
+    rather than jumping straight there).
+    """
+    progression = {
+        "sad": "happy",
+        "stressed": "motivated",
+        "neutral": "happy",
+        "happy": "happy",
+        "motivated": "motivated",
+    }
+    return progression.get(mood, "happy")
+
+
+# Moods that sit at opposite ends of the same axis. Used by _net_mood_score
+# to penalise a track that scores well for the opposite mood, so a track
+# that superficially matches a "happy" keyword but is really a heartbreak
+# song (or vice versa) doesn't get placed in the wrong phase.
+_OPPOSITE_MOOD = {
+    "sad": "happy",
+    "happy": "sad",
+    "stressed": "motivated",
+    "motivated": "stressed",
+}
+
+
 def _mood_boost(track: dict[str, Any], mood: str) -> float:
     text = (
         str(track.get("name", "")) + " " +
         " ".join(a.get("name", "") for a in track.get("artists", []))
     ).lower()
 
+    def has_any(keywords: list[str]) -> bool:
+        # Whole-word match only. Plain substring containment (the previous
+        # behaviour) caused false positives such as "good" matching inside
+        # "Goodbye" - which meant a clearly sad track ("Goodbye Stay") could
+        # score as a happy-keyword match and get pulled into the elevation
+        # phase. \b...\b anchors each keyword to real word boundaries.
+        return any(re.search(rf"\b{re.escape(k)}\b", text) for k in keywords)
+
     if mood == "sad":
-        keywords = ["love", "cry", "alone", "heart", "pain", "stay", "goodbye"]
-        return 3.0 if any(k in text for k in keywords) else 1.0
+        keywords = ["love", "cry", "alone", "heart", "pain", "stay", "goodbye", "miss", "broken", "tears"]
+        return 3.0 if has_any(keywords) else 1.0
 
     if mood == "stressed":
         keywords = ["calm", "breathe", "soft", "peace", "easy", "slow", "focus"]
-        return 3.0 if any(k in text for k in keywords) else 1.0
+        return 3.0 if has_any(keywords) else 1.0
 
     if mood == "motivated":
-        keywords = ["fire", "run", "win", "power", "strong", "rise", "fight"]
-        return 3.0 if any(k in text for k in keywords) else 1.0
+        keywords = ["fire", "run", "win", "power", "strong", "rise", "fight", "unstoppable", "believer"]
+        return 3.0 if has_any(keywords) else 1.0
 
     if mood == "happy":
-        keywords = ["happy", "dance", "love", "sun", "smile"]
-        return 3.0 if any(k in text for k in keywords) else 1.0
+        # NOTE: "love" is deliberately NOT in this list - it also appears in
+        # the "sad" list above (heartbreak songs say "love" constantly too),
+        # so keeping it here made happy/sad scoring ambiguous for any track
+        # with "love" in the title/artist, regardless of the track's actual
+        # mood. Keywords should stay as mutually exclusive as possible
+        # between opposite moods (see _OPPOSITE_MOOD / _net_mood_score).
+        keywords = ["happy", "dance", "sun", "smile", "feeling", "shake", "joy"]
+        return 3.0 if has_any(keywords) else 1.0
+
+    if mood == "neutral":
+        # Neutral has no strong keyword signal by design - it should not
+        # outrank everything else, so it stays at the same baseline as an
+        # unmatched track (1.0) rather than 0, which would otherwise make
+        # neutral tracks always lose ties against a mismatched keyword hit.
+        return 1.0
 
     return 1.0
+
+
+def _net_mood_score(track: dict[str, Any], for_mood: str) -> float:
+    """
+    _mood_boost scores a track against ONE mood in isolation. That let a
+    track like "Alone Again" (no keyword hit for "happy") tie with genuinely
+    upbeat tracks whenever nothing scored higher, and get placed into the
+    elevation phase purely on popularity. This adds a penalty when the track
+    ALSO scores well for the opposite mood, so a track that's really a
+    heartbreak/low-energy song is deprioritised for the elevation phase even
+    if it happens to be popular, and vice versa for the validation phase.
+    """
+    score = _mood_boost(track, for_mood)
+    opposite = _OPPOSITE_MOOD.get(for_mood)
+    if opposite:
+        score -= (_mood_boost(track, opposite) - 1.0)
+    return score
 
 def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
@@ -789,20 +866,82 @@ def _dedupe_tracks(tracks):
 
     return result
 
-def _build_iso_playlist(tracks, mood="neutral"):
+def _build_iso_playlist(tracks, mood="neutral", target_mood="happy"):
+    """
+    Builds the 3-phase Iso-Principle sequence: validation (matches the
+    listener's current mood), transition (bridges the two), and elevation
+    (matches the target mood).
+
+    BUG THIS FIXES: the previous version received a list that was already
+    sorted once by a single mood score and then just sliced it into three
+    equal chunks by position. That meant:
+      1. There was no target_mood at all - nothing pulled the back of the
+         playlist toward a *different*, more positive mood.
+      2. Because every track only ever competed on ONE score (the starting
+         mood), most tracks tied at the same baseline value and effectively
+         kept whatever order the popularity ranking gave them. A track that
+         happened to rank high on popularity but still matched "sad" style
+         keywords could land anywhere in the back two-thirds of the list -
+         which is exactly why a sad-leaning track could resurface around
+         track 7 after the playlist had already turned uplifting.
+
+    THE FIX: each phase is now built by picking the best-scoring *remaining*
+    tracks for that phase's target mood, and removing them from the pool
+    before the next phase is built. A track can therefore only ever be
+    picked for one phase, and the elevation phase is explicitly scored
+    against target_mood instead of inheriting leftovers from the starting
+    mood's sort order.
+    """
     if not tracks:
         return {"validation": [], "transition": [], "elevation": []}
 
-    first_cut = max(1, len(tracks) // 3)
-    second_cut = max(first_cut + 1, (len(tracks) * 2) // 3)
-    validation = tracks[:first_cut]
-    transition = tracks[first_cut:second_cut]
-    elevation = tracks[second_cut:]
+    pool = list(tracks)
+    total = len(pool)
+    first_cut = max(1, total // 3)
+    last_cut = max(first_cut + 1, (total * 2) // 3)
+    validation_size = first_cut
+    elevation_size = total - last_cut
+
+    def popularity(track: dict[str, Any]) -> float:
+        return track.get("popularity") or 0
+
+    def take_best(candidates: list[dict[str, Any]], for_mood: str, count: int):
+        if count <= 0 or not candidates:
+            return [], candidates
+        ranked = sorted(
+            candidates,
+            key=lambda t: (_net_mood_score(t, for_mood), popularity(t)),
+            reverse=True,
+        )
+        chosen = ranked[:count]
+        chosen_ids = {t.get("id") for t in chosen}
+        remaining = [t for t in candidates if t.get("id") not in chosen_ids]
+        return chosen, remaining
+
+    # Phase 1: pick tracks that best match where the listener is RIGHT NOW.
+    validation, pool = take_best(pool, mood, validation_size)
+
+    # Phase 3: from what's left, pick tracks that best match where the
+    # listener is heading. Doing this before transition (instead of after)
+    # guarantees the elevation phase actually trends toward target_mood
+    # rather than just receiving whatever validation didn't use.
+    elevation, pool = take_best(pool, target_mood, elevation_size)
+
+    # Phase 2: whatever remains bridges the two moods. Tracks that don't
+    # strongly match either extreme are the most "transitional" by
+    # definition, so prefer low |start_score - target_score| before falling
+    # back to popularity.
+    def transition_key(t: dict[str, Any]) -> tuple[float, float]:
+        start_score = _mood_boost(t, mood)
+        end_score = _mood_boost(t, target_mood)
+        return (-abs(start_score - end_score), popularity(t))
+
+    transition = sorted(pool, key=transition_key, reverse=True)
 
     return {
         "validation": validation,
         "transition": transition,
-        "elevation": elevation
+        "elevation": elevation,
     }
 
 def _release_year_is_allowed(item: dict[str, Any]) -> bool:
