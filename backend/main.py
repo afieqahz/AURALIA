@@ -105,7 +105,27 @@ async def spotify_search(
     if not token:
         raise HTTPException(status_code=500, detail="Spotify token response did not include access_token.")
 
-    data = await _spotify_track_search(token, q, allow_fallback=allow_fallback)
+    data = await _spotify_track_search(
+        token, q, allow_fallback=allow_fallback, mood=mood, target_mood=target_mood
+    )
+
+    if data.get("auralia_source") == "fallback":
+        # The fallback catalog is a small, hand-picked set of well-known
+        # songs used when Spotify is unavailable/rate limited. Running it
+        # through _rank_mainstream_tracks used to wipe it out entirely:
+        # fallback tracks never set album.release_date, so
+        # _release_year_is_allowed rejected every single one, and a rate
+        # limited request would silently come back with zero tracks
+        # instead of the fallback catalog it was meant to show. The
+        # fallback tracks/iso_sequence are already curated, so pass them
+        # through as-is instead of re-filtering them.
+        if data.get("auralia_error") == "rate_limited":
+            _spotify_search_cache[cache_key] = (
+                now + _spotify_rate_limit_cache_ttl,
+                data,
+            )
+        return data
+
     items = data.get("tracks", {}).get("items", [])
 
     ranked_items = _rank_mainstream_tracks(items)
@@ -201,6 +221,8 @@ async def _spotify_track_search(
     token: str,
     query: str,
     allow_fallback: bool = True,
+    mood: str = "neutral",
+    target_mood: str = "happy",
 ) -> dict[str, Any]:
     clean_query = _simplify_search_query(query)
     constrained_query = _constrain_spotify_query(query)
@@ -226,6 +248,8 @@ async def _spotify_track_search(
                 offsets=offsets,
                 market="MY",
                 allow_fallback=allow_fallback,
+                mood=mood,
+                target_mood=target_mood,
             )
             if response_body.get("auralia_error") == "rate_limited":
                 return response_body
@@ -244,6 +268,8 @@ async def _spotify_track_search(
                 offsets=(0,),
                 market=None,
                 allow_fallback=allow_fallback,
+                mood=mood,
+                target_mood=target_mood,
             )
             if no_market_response.get("auralia_error") == "rate_limited":
                 return no_market_response
@@ -257,7 +283,7 @@ async def _spotify_track_search(
     if not allow_fallback:
         return await _spotify_empty_search(query, "no_usable_spotify_tracks")
 
-    return await _fallback_spotify_search(query)
+    return await _fallback_spotify_search(query, mood=mood, target_mood=target_mood)
 
 
 async def _spotify_search_with_params(
@@ -269,6 +295,8 @@ async def _spotify_search_with_params(
     offsets: tuple[int, ...],
     market: str | None,
     allow_fallback: bool,
+    mood: str = "neutral",
+    target_mood: str = "happy",
 ) -> dict[str, Any]:
     params: dict[str, Any] = {
         "q": search_query,
@@ -325,7 +353,9 @@ async def _spotify_search_with_params(
                         "rate_limited",
                         retry_after=retry_after,
                     )
-                fallback = await _fallback_spotify_search(original_query)
+                fallback = await _fallback_spotify_search(
+                    original_query, mood=mood, target_mood=target_mood
+                )
                 fallback["auralia_error"] = "rate_limited"
                 if retry_after:
                     fallback["retry_after_seconds"] = retry_after
@@ -388,7 +418,11 @@ def _simplify_search_query(query: str) -> str:
     return " ".join(words) or query
 
 
-async def _fallback_spotify_search(query: str) -> dict[str, Any]:
+async def _fallback_spotify_search(
+    query: str,
+    mood: str = "neutral",
+    target_mood: str = "happy",
+) -> dict[str, Any]:
     query_lower = query.lower()
     catalog = _fallback_catalog_for_query(query_lower)
     image_urls = await _spotify_oembed_images([track["id"] for track in catalog])
@@ -404,7 +438,12 @@ async def _fallback_spotify_search(query: str) -> dict[str, Any]:
         for index, track in enumerate(catalog)
     ]
 
-    iso_sequence = _build_iso_playlist(tracks)
+    # Previously called with no mood args, which silently defaulted to
+    # mood="neutral", target_mood="happy" regardless of what the user
+    # actually requested - so a "sad -> happy" request that hit the
+    # fallback path (e.g. due to a Spotify rate limit) would ignore the
+    # user's current mood entirely. Pass the real values through instead.
+    iso_sequence = _build_iso_playlist(tracks, mood, target_mood)
 
     return {
         "auralia_source": "fallback",
@@ -905,12 +944,22 @@ def _build_iso_playlist(tracks, mood="neutral", target_mood="happy"):
     def popularity(track: dict[str, Any]) -> float:
         return track.get("popularity") or 0
 
+    def combined_score(track: dict[str, Any], for_mood: str) -> float:
+        # Mood score alone used to decide phase placement outright, with
+        # popularity only breaking exact ties - so an obscure track with a
+        # lucky keyword hit (e.g. "sun" in the title) could outrank a
+        # famous track with no keyword hit at all. Blending both into one
+        # number means popularity now has continuous influence: a track
+        # needs a *meaningfully* better mood match, not just any match, to
+        # beat a much more popular/familiar one.
+        return _net_mood_score(track, for_mood) * 2 + popularity(track) * 0.15
+
     def take_best(candidates: list[dict[str, Any]], for_mood: str, count: int):
         if count <= 0 or not candidates:
             return [], candidates
         ranked = sorted(
             candidates,
-            key=lambda t: (_net_mood_score(t, for_mood), popularity(t)),
+            key=lambda t: combined_score(t, for_mood),
             reverse=True,
         )
         chosen = ranked[:count]
@@ -994,7 +1043,7 @@ def _looks_like_real_song(item: dict[str, Any]) -> bool:
         return False
 
     popularity = item.get("popularity")
-    if isinstance(popularity, int) and popularity < 65:
+    if isinstance(popularity, int) and popularity < 78:
         return False
 
     return True
