@@ -3,6 +3,7 @@ import base64
 import re
 import os
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -30,7 +31,9 @@ _spotify_rate_limit_cache_ttl = 60
 _spotify_image_cache: dict[str, str] = {}
 _spotify_search_limit = 50
 _min_release_year = 2010
-_max_release_year = 2026
+# Auto-tracks the current year instead of a hardcoded value, so new
+# releases aren't silently filtered out once the calendar turns over.
+_max_release_year = datetime.now(timezone.utc).year
 
 
 @app.get("/health")
@@ -506,7 +509,7 @@ def _fallback_catalog_for_query(query: str) -> list[dict[str, Any]]:
     if any(word in query for word in ["hopeful", "warm", "gentle", "light"]):
         return [
             {"id": "6lanRgr6wXibZr8KgzXxBl", "title": "A Thousand Years", "artist": "Christina Perri"},
-            {"id": "7nUlyv5E5Pz8dsbUd9Y0Ec", "title": "The Climb", "artist": "Miley Cyrus"},
+            {"id": "5x5JM1BSB6vollcIzDocqT", "title": "The Climb", "artist": "Miley Cyrus"},
             {"id": "6lanRgr6wXibZr8KgzXxBl", "title": "A Thousand Years", "artist": "Christina Perri"},
             {"id": "7l1qvxWjxcKpB9PCtBuTbU", "title": "Count on Me", "artist": "Bruno Mars"},
             {"id": "5Hroj5K7vLpIG4FNCRIjbP", "title": "Keep Your Head Up", "artist": "Andy Grammer"},
@@ -537,7 +540,7 @@ def _fallback_catalog_for_query(query: str) -> list[dict[str, Any]]:
             {"id": "1HNkqx9Ahdgi1Ixy2xkKkL", "title": "Photograph", "artist": "Ed Sheeran"},
             {"id": "0T5iIrXA4p5GsubkhuBIKV", "title": "Until I Found You", "artist": "Stephen Sanchez"},
             {"id": "6lanRgr6wXibZr8KgzXxBl", "title": "A Thousand Years", "artist": "Christina Perri"},
-            {"id": "7jLQrCCYdK8A0YcYwHFeQ3", "title": "Location Unknown", "artist": "HONNE, BEKA"},
+            {"id": "4aT6vP9y2eDjxmRGm5ZqSC", "title": "Location Unknown", "artist": "HONNE, BEKA"},
             {"id": "49mWEy5MgtNujgT7xU3emT", "title": "Breathe", "artist": "Taylor Swift, Colbie Caillat"},
             {"id": "1RMJOxR6GRPsBHL8qeC2ux", "title": "Best Part", "artist": "Daniel Caesar, H.E.R."},
             {"id": "57yL3161hUMuw06zzzUCHi", "title": "Like Real People Do", "artist": "Hozier"},
@@ -689,7 +692,7 @@ def _fallback_track_details_by_id() -> dict[str, dict[str, Any]]:
         "5wANPM4fQCJwkGd4rN57mH": {"title": "drivers license", "artist": "Olivia Rodrigo", "duration_ms": 242000},
         "4kflIGfjdZJW4ot2ioixTB": {"title": "Someone Like You", "artist": "Adele", "duration_ms": 285000},
         "6lanRgr6wXibZr8KgzXxBl": {"title": "A Thousand Years", "artist": "Christina Perri", "duration_ms": 285000},
-        "7nUlyv5E5Pz8dsbUd9Y0Ec": {"title": "The Climb", "artist": "Miley Cyrus", "duration_ms": 235000},
+        "5x5JM1BSB6vollcIzDocqT": {"title": "The Climb", "artist": "Miley Cyrus", "duration_ms": 235000},
         "60nZcImufyMA1MKQY3dcCH": {"title": "Happy", "artist": "Pharrell Williams", "duration_ms": 232000},
         "1p80LdxRV74UKvL8gnD7ky": {"title": "Shake It Off", "artist": "Taylor Swift", "duration_ms": 219000},
         "463CkQjx2Zk1yXoBuierM9": {"title": "Levitating", "artist": "Dua Lipa", "duration_ms": 203000},
