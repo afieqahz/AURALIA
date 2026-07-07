@@ -30,7 +30,7 @@ _spotify_search_cache_ttl = 60 * 60 * 6
 _spotify_rate_limit_cache_ttl = 60
 _spotify_image_cache: dict[str, str] = {}
 _spotify_search_limit = 50
-_min_release_year = 2018
+_min_release_year = 2010
 # Auto-tracks the current year instead of a hardcoded value, so new
 # releases aren't silently filtered out once the calendar turns over.
 _max_release_year = datetime.now(timezone.utc).year
@@ -112,12 +112,6 @@ async def spotify_search(
         token, q, allow_fallback=allow_fallback, mood=mood, target_mood=target_mood
     )
 
-    print(
-        f"[AURALIA_DEBUG] query={q!r} mood={mood!r} target_mood={target_mood!r} "
-        f"source={data.get('auralia_source')!r} error={data.get('auralia_error')!r}",
-        flush=True,
-    )
-
     if data.get("auralia_source") == "fallback":
         # The fallback catalog is a small, hand-picked set of well-known
         # songs used when Spotify is unavailable/rate limited. Running it
@@ -136,7 +130,6 @@ async def spotify_search(
         return data
 
     items = data.get("tracks", {}).get("items", [])
-    items = await _enrich_with_real_popularity(token, items)
 
     ranked_items = _rank_mainstream_tracks(items)
     ranked_items = _dedupe_tracks(ranked_items)
@@ -226,55 +219,6 @@ async def _spotify_tracks_lookup(
 
     return None
 
-
-async def _enrich_with_real_popularity(
-    token: str, items: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
-    """
-    BUG THIS FIXES: /v1/search is returning popularity=None for every
-    single track under this app's current Spotify API credentials -
-    including unambiguously famous songs (Ed Sheeran, Kendrick Lamar).
-    That's not a per-track data gap, it's the search endpoint omitting
-    the field entirely, so filtering on search-result popularity can
-    never work no matter how the threshold is tuned.
-
-    The batch "Get Several Tracks" endpoint (already used by
-    _spotify_tracks_lookup for /spotify/tracks) does return real
-    popularity, so this re-fetches each candidate by id from that
-    endpoint and merges the real value back onto the search-result item.
-    """
-    ids = [item.get("id") for item in items if isinstance(item, dict) and item.get("id")]
-    ids = list(dict.fromkeys(ids))
-    if not ids:
-        return items
-
-    popularity_by_id: dict[str, Any] = {}
-    chunk_size = 50
-    for start in range(0, len(ids), chunk_size):
-        chunk = ids[start:start + chunk_size]
-        try:
-            lookup = await _spotify_tracks_lookup(token, chunk)
-        except HTTPException:
-            lookup = None
-        if not lookup:
-            continue
-        for track in lookup.get("tracks", []) or []:
-            if isinstance(track, dict) and track.get("id"):
-                popularity_by_id[track["id"]] = track.get("popularity")
-
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        real_popularity = popularity_by_id.get(item.get("id"))
-        print(
-            f"[AURALIA_DEBUG] enrich id={item.get('id')!r} name={item.get('name')!r} "
-            f"old_popularity={item.get('popularity')!r} real_popularity={real_popularity!r}",
-            flush=True,
-        )
-        if real_popularity is not None:
-            item["popularity"] = real_popularity
-
-    return items
 
 async def _spotify_track_search(
     token: str,
@@ -927,28 +871,14 @@ def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]
         seen_tracks.add(key)
         unique_items.append(item)
 
-    playable = []
-    for item in unique_items:
-        name = item.get("name", "")
-        artists = item.get("artists") or []
-        artist = artists[0].get("name", "") if artists and isinstance(artists[0], dict) else ""
-        pop = item.get("popularity")
-
-        is_playable_ok = item.get("is_playable", True)
-        is_local_ok = not item.get("is_local", False)
-        year_ok = _release_year_is_allowed(item)
-        real_song_ok = _looks_like_real_song(item)
-        passed = is_playable_ok and is_local_ok and year_ok and real_song_ok
-
-        print(
-            f"[AURALIA_DEBUG] candidate name={name!r} artist={artist!r} "
-            f"popularity={pop!r} is_playable={is_playable_ok} is_local_ok={is_local_ok} "
-            f"year_ok={year_ok} real_song_ok={real_song_ok} PASSED={passed}",
-            flush=True,
-        )
-
-        if passed:
-            playable.append(item)
+    playable = [
+        item
+        for item in unique_items
+        if item.get("is_playable", True)
+        and not item.get("is_local", False)
+        and _release_year_is_allowed(item)
+        and _looks_like_real_song(item)
+    ]
 
     def score(track: dict[str, Any]) -> float:
         popularity = track.get("popularity") or 0
@@ -1123,14 +1053,7 @@ def _looks_like_real_song(item: dict[str, Any]) -> bool:
         return False
 
     popularity = item.get("popularity")
-    # BUG THIS FIXES: `isinstance(popularity, int) and popularity < 85`
-    # skipped the whole check whenever popularity was None - which let
-    # keyword-stuffed stock/library tracks (e.g. titled literally
-    # "Uplifting Pop Happy Summer") through unfiltered, since Spotify
-    # returned no popularity value for them at all. A genuine, real-world
-    # track from Spotify's search always has an int popularity score, so
-    # missing/non-int popularity now fails the check instead of skipping it.
-    if not isinstance(popularity, int) or popularity < 85:
+    if isinstance(popularity, int) and popularity < 85:
         return False
 
     return True
