@@ -112,6 +112,12 @@ async def spotify_search(
         token, q, allow_fallback=allow_fallback, mood=mood, target_mood=target_mood
     )
 
+    print(
+        f"[AURALIA_DEBUG] query={q!r} mood={mood!r} target_mood={target_mood!r} "
+        f"source={data.get('auralia_source')!r} error={data.get('auralia_error')!r}",
+        flush=True,
+    )
+
     if data.get("auralia_source") == "fallback":
         # The fallback catalog is a small, hand-picked set of well-known
         # songs used when Spotify is unavailable/rate limited. Running it
@@ -871,14 +877,28 @@ def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]
         seen_tracks.add(key)
         unique_items.append(item)
 
-    playable = [
-        item
-        for item in unique_items
-        if item.get("is_playable", True)
-        and not item.get("is_local", False)
-        and _release_year_is_allowed(item)
-        and _looks_like_real_song(item)
-    ]
+    playable = []
+    for item in unique_items:
+        name = item.get("name", "")
+        artists = item.get("artists") or []
+        artist = artists[0].get("name", "") if artists and isinstance(artists[0], dict) else ""
+        pop = item.get("popularity")
+
+        is_playable_ok = item.get("is_playable", True)
+        is_local_ok = not item.get("is_local", False)
+        year_ok = _release_year_is_allowed(item)
+        real_song_ok = _looks_like_real_song(item)
+        passed = is_playable_ok and is_local_ok and year_ok and real_song_ok
+
+        print(
+            f"[AURALIA_DEBUG] candidate name={name!r} artist={artist!r} "
+            f"popularity={pop!r} is_playable={is_playable_ok} is_local_ok={is_local_ok} "
+            f"year_ok={year_ok} real_song_ok={real_song_ok} PASSED={passed}",
+            flush=True,
+        )
+
+        if passed:
+            playable.append(item)
 
     def score(track: dict[str, Any]) -> float:
         popularity = track.get("popularity") or 0
