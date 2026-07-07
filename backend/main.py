@@ -956,12 +956,13 @@ def _build_iso_playlist(tracks, mood="neutral", target_mood="happy"):
         # needs a *meaningfully* better mood match, not just any match, to
         # beat a much more popular/familiar one.
         #
-        # Popularity weight raised from 0.15 -> 0.35 (and mood weight eased
-        # from 2 -> 1.5) so well-known tracks surface more often relative to
-        # obscure ones with a strong keyword hit. Mood still dominates the
-        # score, so each phase keeps trending toward its target mood - this
-        # just lets fame break close calls more often.
-        return _net_mood_score(track, for_mood) * 1.5 + popularity(track) * 0.35
+        # Popularity weight raised again: 0.15 -> 0.35 -> 0.5 (mood weight
+        # eased 2 -> 1.5) since even a raised 85+ popularity floor still
+        # leaves enough spread between borderline-famous (85) and very
+        # famous (99) tracks that mood alone could still favor the
+        # less-recognizable one. Mood still carries the larger share of
+        # the score, so phases keep trending toward their target mood.
+        return _net_mood_score(track, for_mood) * 1.5 + popularity(track) * 0.5
 
     def take_best(candidates: list[dict[str, Any]], for_mood: str, count: int):
         if count <= 0 or not candidates:
@@ -1052,7 +1053,7 @@ def _looks_like_real_song(item: dict[str, Any]) -> bool:
         return False
 
     popularity = item.get("popularity")
-    if isinstance(popularity, int) and popularity < 78:
+    if isinstance(popularity, int) and popularity < 85:
         return False
 
     return True
