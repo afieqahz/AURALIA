@@ -136,6 +136,7 @@ async def spotify_search(
         return data
 
     items = data.get("tracks", {}).get("items", [])
+    items = await _enrich_with_real_popularity(token, items)
 
     ranked_items = _rank_mainstream_tracks(items)
     ranked_items = _dedupe_tracks(ranked_items)
@@ -225,6 +226,55 @@ async def _spotify_tracks_lookup(
 
     return None
 
+
+async def _enrich_with_real_popularity(
+    token: str, items: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """
+    BUG THIS FIXES: /v1/search is returning popularity=None for every
+    single track under this app's current Spotify API credentials -
+    including unambiguously famous songs (Ed Sheeran, Kendrick Lamar).
+    That's not a per-track data gap, it's the search endpoint omitting
+    the field entirely, so filtering on search-result popularity can
+    never work no matter how the threshold is tuned.
+
+    The batch "Get Several Tracks" endpoint (already used by
+    _spotify_tracks_lookup for /spotify/tracks) does return real
+    popularity, so this re-fetches each candidate by id from that
+    endpoint and merges the real value back onto the search-result item.
+    """
+    ids = [item.get("id") for item in items if isinstance(item, dict) and item.get("id")]
+    ids = list(dict.fromkeys(ids))
+    if not ids:
+        return items
+
+    popularity_by_id: dict[str, Any] = {}
+    chunk_size = 50
+    for start in range(0, len(ids), chunk_size):
+        chunk = ids[start:start + chunk_size]
+        try:
+            lookup = await _spotify_tracks_lookup(token, chunk)
+        except HTTPException:
+            lookup = None
+        if not lookup:
+            continue
+        for track in lookup.get("tracks", []) or []:
+            if isinstance(track, dict) and track.get("id"):
+                popularity_by_id[track["id"]] = track.get("popularity")
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        real_popularity = popularity_by_id.get(item.get("id"))
+        print(
+            f"[AURALIA_DEBUG] enrich id={item.get('id')!r} name={item.get('name')!r} "
+            f"old_popularity={item.get('popularity')!r} real_popularity={real_popularity!r}",
+            flush=True,
+        )
+        if real_popularity is not None:
+            item["popularity"] = real_popularity
+
+    return items
 
 async def _spotify_track_search(
     token: str,
