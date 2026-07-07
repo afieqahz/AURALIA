@@ -955,7 +955,13 @@ def _build_iso_playlist(tracks, mood="neutral", target_mood="happy"):
         # number means popularity now has continuous influence: a track
         # needs a *meaningfully* better mood match, not just any match, to
         # beat a much more popular/familiar one.
-        return _net_mood_score(track, for_mood) * 2 + popularity(track) * 0.15
+        #
+        # Popularity weight raised from 0.15 -> 0.35 (and mood weight eased
+        # from 2 -> 1.5) so well-known tracks surface more often relative to
+        # obscure ones with a strong keyword hit. Mood still dominates the
+        # score, so each phase keeps trending toward its target mood - this
+        # just lets fame break close calls more often.
+        return _net_mood_score(track, for_mood) * 1.5 + popularity(track) * 0.35
 
     def take_best(candidates: list[dict[str, Any]], for_mood: str, count: int):
         if count <= 0 or not candidates:
