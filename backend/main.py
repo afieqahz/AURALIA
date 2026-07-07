@@ -1073,7 +1073,14 @@ def _looks_like_real_song(item: dict[str, Any]) -> bool:
         return False
 
     popularity = item.get("popularity")
-    if isinstance(popularity, int) and popularity < 85:
+    # BUG THIS FIXES: `isinstance(popularity, int) and popularity < 85`
+    # skipped the whole check whenever popularity was None - which let
+    # keyword-stuffed stock/library tracks (e.g. titled literally
+    # "Uplifting Pop Happy Summer") through unfiltered, since Spotify
+    # returned no popularity value for them at all. A genuine, real-world
+    # track from Spotify's search always has an int popularity score, so
+    # missing/non-int popularity now fails the check instead of skipping it.
+    if not isinstance(popularity, int) or popularity < 85:
         return False
 
     return True
