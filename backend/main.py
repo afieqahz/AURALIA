@@ -30,7 +30,7 @@ _spotify_search_cache_ttl = 60 * 60 * 6
 _spotify_rate_limit_cache_ttl = 60
 _spotify_image_cache: dict[str, str] = {}
 _spotify_search_limit = 50
-_min_release_year = 2010
+_min_release_year = 2018
 # Auto-tracks the current year instead of a hardcoded value, so new
 # releases aren't silently filtered out once the calendar turns over.
 _max_release_year = datetime.now(timezone.utc).year
