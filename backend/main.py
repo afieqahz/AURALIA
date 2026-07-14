@@ -773,6 +773,12 @@ _OPPOSITE_MOOD = {
     "motivated": "stressed",
 }
 
+# Score for a track with zero keyword hits for a given mood. Kept as a
+# module-level constant (rather than a literal repeated in both
+# _mood_boost and _net_mood_score) so the two functions can't drift out of
+# sync with each other if this value is tuned again later.
+_NO_MATCH_SCORE = 0.4
+
 
 def _mood_boost(track: dict[str, Any], mood: str) -> float:
     text = (
@@ -788,17 +794,53 @@ def _mood_boost(track: dict[str, Any], mood: str) -> float:
         # phase. \b...\b anchors each keyword to real word boundaries.
         return any(re.search(rf"\b{re.escape(k)}\b", text) for k in keywords)
 
+    # BASELINE CHANGE: an untagged track (no keyword hit) now scores
+    # _NO_MATCH_SCORE (0.4), not 1.0. Previously every track with zero
+    # keyword hits tied with every other zero-hit track at the same
+    # baseline as a genuine match's non-winning side, so on a pool where
+    # nothing in the title/artist text matched any keyword (very common -
+    # most song titles don't literally spell out their mood), _mood_boost
+    # returned a flat 1.0 for the entire pool and phase placement silently
+    # fell back to popularity alone. A lower no-match baseline means: (a) a
+    # real keyword hit still clearly outranks an untagged track, (b)
+    # untagged tracks no longer masquerade as a "match" for the opposite
+    # mood's _net_mood_score penalty, and (c) untagged tracks naturally
+    # sort toward the transition phase instead of randomly winning
+    # validation/elevation on a popularity coin-flip.
+    NO_MATCH_SCORE = _NO_MATCH_SCORE
+
     if mood == "sad":
-        keywords = ["love", "cry", "alone", "heart", "pain", "stay", "goodbye", "miss", "broken", "tears"]
-        return 3.0 if has_any(keywords) else 1.0
+        # Expanded from the original 10-word list, which missed most real
+        # sad songs (e.g. "Wish You Were Here", "Rx (Medicate)") because
+        # they don't literally contain "love"/"cry"/"heart"/etc.
+        keywords = [
+            "love", "cry", "cried", "crying", "alone", "lonely", "heart", "heartbreak",
+            "pain", "hurt", "hurts", "stay", "goodbye", "miss", "missing", "broken",
+            "break", "tears", "tear", "sorry", "regret", "empty", "numb", "gone",
+            "apart", "fade", "fading", "faded", "grey", "gray", "quiet", "silence",
+            "wish", "wishing", "scars", "scared", "afraid", "lost", "losing",
+            "sad", "blue", "rain", "rainy", "cold", "dark", "darkness", "ghost",
+            "memories", "memory", "remember", "regretting", "medicate", "medicated",
+        ]
+        return 3.0 if has_any(keywords) else NO_MATCH_SCORE
 
     if mood == "stressed":
-        keywords = ["calm", "breathe", "soft", "peace", "easy", "slow", "focus"]
-        return 3.0 if has_any(keywords) else 1.0
+        keywords = [
+            "calm", "breathe", "breathing", "soft", "peace", "peaceful", "easy",
+            "slow", "focus", "focused", "still", "steady", "rest", "resting",
+            "gentle", "quiet", "settle", "settled", "ease", "grounded", "anchor",
+        ]
+        return 3.0 if has_any(keywords) else NO_MATCH_SCORE
 
     if mood == "motivated":
-        keywords = ["fire", "run", "win", "power", "strong", "rise", "fight", "unstoppable", "believer"]
-        return 3.0 if has_any(keywords) else 1.0
+        keywords = [
+            "fire", "run", "running", "win", "winning", "power", "powerful",
+            "strong", "stronger", "rise", "rising", "fight", "fighting",
+            "unstoppable", "believer", "up", "higher", "climb", "climbing",
+            "hustle", "grind", "warrior", "legend", "champion", "victory",
+            "squabble", "battle", "energy", "alive",
+        ]
+        return 3.0 if has_any(keywords) else NO_MATCH_SCORE
 
     if mood == "happy":
         # NOTE: "love" is deliberately NOT in this list - it also appears in
@@ -807,17 +849,24 @@ def _mood_boost(track: dict[str, Any], mood: str) -> float:
         # with "love" in the title/artist, regardless of the track's actual
         # mood. Keywords should stay as mutually exclusive as possible
         # between opposite moods (see _OPPOSITE_MOOD / _net_mood_score).
-        keywords = ["happy", "dance", "sun", "smile", "feeling", "shake", "joy"]
-        return 3.0 if has_any(keywords) else 1.0
+        keywords = [
+            "happy", "dance", "dancing", "sun", "sunshine", "sunny", "smile",
+            "smiling", "feeling", "good", "great", "shake", "joy", "joyful",
+            "bright", "brighter", "light", "gold", "golden", "free", "freedom",
+            "celebrate", "celebration", "party", "warm", "warmth", "sweet",
+            "perfect", "better", "best", "alive", "young", "fun", "vibe", "vibes",
+        ]
+        return 3.0 if has_any(keywords) else NO_MATCH_SCORE
 
     if mood == "neutral":
         # Neutral has no strong keyword signal by design - it should not
         # outrank everything else, so it stays at the same baseline as an
-        # unmatched track (1.0) rather than 0, which would otherwise make
-        # neutral tracks always lose ties against a mismatched keyword hit.
-        return 1.0
+        # unmatched track (NO_MATCH_SCORE) rather than a value that would
+        # let neutral tracks always win or lose ties against a mismatched
+        # keyword hit.
+        return NO_MATCH_SCORE
 
-    return 1.0
+    return NO_MATCH_SCORE
 
 
 def _net_mood_score(track: dict[str, Any], for_mood: str) -> float:
@@ -833,7 +882,7 @@ def _net_mood_score(track: dict[str, Any], for_mood: str) -> float:
     score = _mood_boost(track, for_mood)
     opposite = _OPPOSITE_MOOD.get(for_mood)
     if opposite:
-        score -= (_mood_boost(track, opposite) - 1.0)
+        score -= (_mood_boost(track, opposite) - _NO_MATCH_SCORE)
     return score
 
 def _rank_mainstream_tracks(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
